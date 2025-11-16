@@ -179,9 +179,9 @@ def _make_style(term: Terminal, fg: RGB, bg: RGB | None, bold: bool) -> str:
     if not term.does_styling:
         return term.normal
 
-    fg_rgb = _rgba_to_rgb_int(fg)
+    fg_rgb = _rgb_to_rgb_int(fg)
     bg_use = bg if bg is not None else BACKGROUND_COLOR
-    bg_rgb = _rgba_to_rgb_int(bg_use)
+    bg_rgb = _rgb_to_rgb_int(bg_use)
 
     fg_str = term.color_rgb(*fg_rgb)
     bg_str = term.on_color_rgb(*bg_rgb)
@@ -190,7 +190,7 @@ def _make_style(term: Terminal, fg: RGB, bg: RGB | None, bold: bool) -> str:
     return f"{term.normal}{bold_str}{fg_str}{bg_str}"
 
 
-def _rgba_to_rgb_int(color: RGB) -> tuple[int, int, int]:
+def _rgb_to_rgb_int(color: RGB) -> tuple[int, int, int]:
     arr = np.array((color.r, color.g, color.b), dtype=np.float64)
     scaled = np.clip(np.round(arr * 255.0), 0, 255).astype(np.int32)
     return int(scaled[0]), int(scaled[1]), int(scaled[2])
@@ -246,11 +246,8 @@ def print_at(
         px += n
 
 
-def fill_screen_background(terminal: Terminal, screen: Screen, color: "RGB"):
-    """
-    Vectorized fill of the entire new_buffer with spaces + background style.
-    Does not modify the RGB type or create_buffer.
-    """
-    bg_style = terminal.on_color_rgb(*_rgba_to_rgb_int(color))
-    screen.new_buffer.styles[:, :] = bg_style
+def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:
+    bg_style = term.on_color_rgb(*_rgb_to_rgb_int(color))
+
     screen.new_buffer.chars[:, :] = " "
+    screen.new_buffer.styles[:, :] = bg_style

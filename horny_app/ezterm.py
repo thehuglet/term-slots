@@ -53,8 +53,8 @@ BACKGROUND_COLOR = RGB.BLACK
 class RichText:
     text: str
     color: RGB = field(default_factory=lambda: RGB.WHITE)
-    bold: bool = False
     bg: RGB | None = None
+    bold: bool = False
 
 
 @dataclass
@@ -108,7 +108,9 @@ def buffer_diff(screen: Screen) -> list[tuple[int, int, ScreenCell]]:
 
 
 def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> None:
-    output = [term.move_xy(x, y) + style + char for y, x, (char, style) in diffs]
+    output = [
+        term.move_xy(x, y) + style + char + term.normal for y, x, (char, style) in diffs
+    ]
     sys.stdout.write("".join(output))
     sys.stdout.flush()
 

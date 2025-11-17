@@ -6,7 +6,7 @@ from functools import partial
 from random import shuffle, uniform
 from typing import Callable, cast
 
-from blessed.terminal import Terminal
+from blessed import Terminal
 
 from horny_app.ezterm import (
     BACKGROUND_COLOR,
@@ -267,6 +267,10 @@ def main():
         screen,
         Slots(
             columns=[
+                Column(0, FULL_DECK.copy()),
+                Column(0, FULL_DECK.copy()),
+                Column(0, FULL_DECK.copy()),
+                Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),

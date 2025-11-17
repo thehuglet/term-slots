@@ -109,7 +109,8 @@ def buffer_diff(screen: Screen) -> list[tuple[int, int, ScreenCell]]:
 
 def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> None:
     output = [
-        term.move_xy(x, y) + style + char + term.normal for y, x, (char, style) in diffs
+        term.move_xy(int(x), int(y)) + style + char + term.normal
+        for y, x, (char, style) in diffs
     ]
     sys.stdout.write("".join(output))
     sys.stdout.flush()

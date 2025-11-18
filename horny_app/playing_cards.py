@@ -36,8 +36,8 @@ class PlayingCard:
 SUIT_COLOR: dict[Suit, RGB] = {
     Suit.SPADE: RGB.BLACK,
     Suit.CLUB: RGB.BLACK,
-    Suit.HEART: RGB.RED * 0.9,
-    Suit.DIAMOND: RGB.RED * 0.9,
+    Suit.HEART: RGB.RED * 0.7,
+    Suit.DIAMOND: RGB.RED * 0.7,
 }
 
 SUIT_STR: dict[Suit, str] = {
@@ -74,12 +74,12 @@ def card_rich_text(card: PlayingCard) -> RichText:
     rank_str = RANK_STR[card.rank]
 
     text = suit_str + rank_str.rjust(2)
-    # Debug for showing only the bg
+    # Debug for only showing the bg
     # text = "   "
 
     return RichText(
         text=text,
-        color=suit_color,
-        bg=RGB.WHITE * 0.8,
+        text_color=suit_color,
+        bg_color=RGB.WHITE * 0.8,
         bold=True,
     )

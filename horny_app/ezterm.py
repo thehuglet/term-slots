@@ -23,6 +23,10 @@ class RGB:
     RED: ClassVar[RGB]
     GREEN: ClassVar[RGB]
     BLUE: ClassVar[RGB]
+    ORANGE: ClassVar[RGB]
+    LIGHT_BLUE: ClassVar[RGB]
+    GOLD: ClassVar[RGB]
+    CYAN: ClassVar[RGB]
 
     def __mul__(self, other: float | RGB):
         if isinstance(other, RGB):
@@ -45,6 +49,10 @@ RGB.BLACK = RGB(0.0, 0.0, 0.0)
 RGB.RED = RGB(1.0, 0.0, 0.0)
 RGB.GREEN = RGB(0.0, 1.0, 0.0)
 RGB.BLUE = RGB(0.0, 0.0, 1.0)
+RGB.ORANGE = RGB(1.0, 0.5, 0.0)
+RGB.LIGHT_BLUE = RGB(0.65, 0.85, 0.9)
+RGB.GOLD = RGB(1.0, 0.85, 0.0)
+RGB.CYAN = RGB(0.0, 1.0, 1.0)
 
 BACKGROUND_COLOR = RGB.BLACK
 
@@ -52,8 +60,8 @@ BACKGROUND_COLOR = RGB.BLACK
 @dataclass
 class RichText:
     text: str
-    color: RGB = field(default_factory=lambda: RGB.WHITE)
-    bg: RGB | None = None
+    text_color: RGB = field(default_factory=lambda: RGB.WHITE)
+    bg_color: RGB = field(default_factory=lambda: BACKGROUND_COLOR)
     bold: bool = False
 
 
@@ -81,6 +89,25 @@ class Screen:
 class FPSCounter:
     ema: float = 0.0
     alpha: float = 0.08
+
+
+def lerp_rgb(a: RGB, b: RGB, t: float) -> RGB:
+    """
+    Linear interpolation between two RGB colors.
+    t = 0 → returns a
+    t = 1 → returns b
+    """
+    # Optional: clamp t for safety
+    if t <= 0.0:
+        return a
+    if t >= 1.0:
+        return b
+
+    return RGB(
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t,
+    )
 
 
 def create_buffer(width: int, height: int) -> ScreenBuffer:
@@ -229,7 +256,7 @@ def print_at(
 
     px = x
     for seg in segments:
-        style = _make_style(term, seg.color, seg.bg, seg.bold)
+        style = _make_style(term, seg.text_color, seg.bg_color, seg.bold)
         # safe per-codepoint array (handles unicode characters)
         chars_arr = np.array(list(seg.text), dtype="<U1")
         n = chars_arr.shape[0]

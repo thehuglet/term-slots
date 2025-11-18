@@ -16,6 +16,7 @@ class Column:
 
 @dataclass
 class Slots:
+    selected_column_index: int = 0
     columns: list[Column] = field(default_factory=list)
 
 

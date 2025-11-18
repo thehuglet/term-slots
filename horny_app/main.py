@@ -47,7 +47,7 @@ class Context:
     term: Terminal
     screen: Screen
     slots: Slots
-    time_running: float = 0.0
+    fps_counter: FPSCounter
     debug_text: str | RichText = ""
 
 
@@ -55,8 +55,8 @@ def tick(
     ctx: Context,
     delta_time: float,
     print_at: PrintAtCallable,
-    fps_counter: FPSCounter,
 ) -> ProgramStatus:
+    # --- Input handling ---
     key = ctx.term.inkey(0.0)
 
     slots_spinning = ctx.slots.columns[-1].spin_time_remaining > 0.0
@@ -82,23 +82,26 @@ def tick(
     elif key.name == "KEY_RIGHT" and slots_can_move_right:
         ctx.slots.selected_column_index += 1
 
+    # --- Game logic ---
+    # Slots
+    for n, column in enumerate(ctx.slots.columns):
+        if not column.spin_time_remaining:
+            continue
+
+        spin_speed = calc_spin_speed(
+            column.spin_duration,
+            column.spin_time_remaining,
+            snap_threshold=0.15,
+        )
+        column.cursor -= spin_speed * delta_time
+        column.spin_time_remaining = max(0.0, column.spin_time_remaining - delta_time)
+
+        if spin_speed == 0.0:
+            column.spin_time_remaining = 0.0
+
     fill_screen_background(ctx.term, ctx.screen, BACKGROUND_COLOR)
 
     for n, column in enumerate(ctx.slots.columns):
-        # --- Column spinning logic ---
-        if column.spin_time_remaining > 0.0:
-            duration = column.spin_duration
-            time_remaining = column.spin_time_remaining
-
-            spin_speed = calc_spin_speed(duration, time_remaining, snap_threshold=0.15)
-            column.cursor -= spin_speed * delta_time
-
-            column.spin_time_remaining = max(0.0, time_remaining - delta_time)
-
-            # This is done to account for snapping
-            if spin_speed == 0.0:
-                column.spin_time_remaining = 0.0
-
         # --- Slot column rendering ---
         column_spacing = 5
         column_x = 5 + n * column_spacing
@@ -142,13 +145,13 @@ def tick(
 
             print_at(column_x, column_y + row_offset, rich_text)
 
-    update_fps_counter(fps_counter, delta_time)
-    fps_text = f"{fps_counter.ema:5.1f} FPS"
-    color = RGB.WHITE
-    x = max(0, ctx.screen.width - len(fps_text) - 1)
-    print_at(x, 0, RichText(fps_text, color))
+    update_fps_counter(ctx.fps_counter, delta_time)
 
-    ctx.time_running += delta_time
+    # FPS Display
+    fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
+    x = max(0, ctx.screen.width - len(fps_text) - 1)
+    print_at(x, 0, RichText(fps_text, RGB.WHITE))
+
     flush_diffs(ctx.term, buffer_diff(ctx.screen))
     return ProgramStatus.RUNNING
 
@@ -158,38 +161,36 @@ def main():
     term = Terminal()
     screen = Screen(term.width, term.height)
     ctx = Context(
-        term,
-        screen,
-        Slots(
+        term=term,
+        screen=screen,
+        slots=Slots(
             columns=[
                 Column(0, foo),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
             ]
         ),
+        fps_counter=FPSCounter(),
     )
 
     for column in ctx.slots.columns:
         random.shuffle(column.cards)
 
     print_at = partial(verbose_print_at, term, screen)
-
     fps_limiter = create_fps_limiter(144)
-    fps_counter = FPSCounter()
 
     with (
         term.cbreak(),
         term.hidden_cursor(),
         term.fullscreen(),
     ):
-        delta_time: float = 0.0
+        delta_time: float = 0.01666
 
         while True:
             tick_outcome: ProgramStatus = tick(
                 ctx,
                 delta_time,
                 print_at,
-                fps_counter,
             )
             if tick_outcome == ProgramStatus.EXIT:
                 break

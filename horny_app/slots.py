@@ -5,8 +5,8 @@ from horny_app.playing_cards import PlayingCard
 
 @dataclass
 class Column:
-    # Cursor is a float for easier management with spinning logic,
-    # retrieving the card at the cursor should be done with round()
+    # Cursor is a float for easier incrementation
+    # will have to be converted into an int to use as index
     cursor: float
     cards: list[PlayingCard] = field(default_factory=list)
     spin_duration: float = 0.0

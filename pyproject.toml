@@ -9,8 +9,12 @@ dependencies = [
     "numpy>=2.3.4",
 ]
 
+
 [project.scripts]
 main = "horny_app.main:main"
 
 [tool.uv]
 package = true
+
+[tool.ruff]
+line-length = 100

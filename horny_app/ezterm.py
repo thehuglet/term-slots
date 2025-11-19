@@ -11,6 +11,8 @@ from blessed import Terminal
 # A cell is (character, style)
 ScreenCell = tuple[str, str]
 
+type PrintAtCallable = Callable[[int, int, str | RichText | list[str | RichText]], None]
+
 
 @dataclass
 class RGB:
@@ -86,6 +88,13 @@ class Screen:
 
 
 @dataclass
+class DrawInstruction:
+    x: int
+    y: int
+    rich_text: RichText
+
+
+@dataclass
 class FPSCounter:
     ema: float = 0.0
     alpha: float = 0.08
@@ -126,9 +135,7 @@ def buffer_diff(screen: Screen) -> list[tuple[int, int, ScreenCell]]:
     diffs = [(y, x, (new.chars[y, x], new.styles[y, x])) for y, x in zip(ys, xs)]  # type: ignore
 
     # Update buffers
-    screen.old_buffer = ScreenBuffer(
-        new.width, new.height, new.chars.copy(), new.styles.copy()
-    )
+    screen.old_buffer = ScreenBuffer(new.width, new.height, new.chars.copy(), new.styles.copy())
     screen.new_buffer = create_buffer(screen.width, screen.height)
 
     return diffs  # type: ignore
@@ -136,8 +143,7 @@ def buffer_diff(screen: Screen) -> list[tuple[int, int, ScreenCell]]:
 
 def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> None:
     output = [
-        term.move_xy(int(x), int(y)) + style + char + term.normal
-        for y, x, (char, style) in diffs
+        term.move_xy(int(x), int(y)) + style + char + term.normal for y, x, (char, style) in diffs
     ]
     sys.stdout.write("".join(output))
     sys.stdout.flush()

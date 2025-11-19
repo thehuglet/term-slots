@@ -9,10 +9,12 @@ from typing import Callable, cast
 
 from blessed import Terminal
 
+from horny_app.context import Context, GameState
 from horny_app.ezterm import (
     BACKGROUND_COLOR,
     RGB,
     FPSCounter,
+    PrintAtCallable,
     RichText,
     Screen,
     buffer_diff,
@@ -23,7 +25,8 @@ from horny_app.ezterm import (
     update_fps_counter,
 )
 from horny_app.ezterm import print_at as verbose_print_at
-from horny_app.playing_cards import (
+from horny_app.input import Action, Input, ValidatedInputAction, map_input, resolve_input
+from horny_app.playing_card import (
     FULL_DECK,
     RANK_STR,
     SUIT_STR,
@@ -32,23 +35,20 @@ from horny_app.playing_cards import (
     Suit,
     card_rich_text,
 )
-from horny_app.slots import Column, Slots, calc_spin_speed, wrap_cursor
-
-type PrintAtCallable = Callable[[int, int, str | RichText | list[str | RichText]], None]
+from horny_app.slots import (
+    Column,
+    Slots,
+    calc_spin_speed,
+    render_column,
+    render_slots,
+    tick_slots,
+    wrap_cursor,
+)
 
 
 class ProgramStatus(Enum):
     RUNNING = auto()
     EXIT = auto()
-
-
-@dataclass
-class Context:
-    term: Terminal
-    screen: Screen
-    slots: Slots
-    fps_counter: FPSCounter
-    debug_text: str | RichText = ""
 
 
 def tick(
@@ -60,12 +60,9 @@ def tick(
     key = ctx.term.inkey(0.0)
 
     slots_spinning = ctx.slots.columns[-1].spin_time_remaining > 0.0
-    slots_can_move_left: bool = (
-        not slots_spinning and ctx.slots.selected_column_index > 0
-    )
+    slots_can_move_left: bool = not slots_spinning and ctx.slots.selected_column_index > 0
     slots_can_move_right: bool = (
-        not slots_spinning
-        and ctx.slots.selected_column_index < len(ctx.slots.columns) - 1
+        not slots_spinning and ctx.slots.selected_column_index < len(ctx.slots.columns) - 1
     )
 
     if key.lower() == "q":
@@ -103,10 +100,12 @@ def tick(
 
     for n, column in enumerate(ctx.slots.columns):
         # --- Slot column rendering ---
-        column_spacing = 5
-        column_x = 5 + n * column_spacing
+        spacing = 5
+        column_x = 5 + n * spacing
         column_y = 5
-        column_is_selected = ctx.slots.selected_column_index == n
+        x = 5 + n * spacing
+        is_selected = ctx.slots.selected_column_index == n
+        # render_column(x, 5, column, is_selected)
 
         neighbor_count = 3
         for row_offset in range(-neighbor_count, neighbor_count + 1):
@@ -115,7 +114,7 @@ def tick(
             card_index = wrap_cursor(int(column.cursor + row_offset), column.cards)
             rich_text = card_rich_text(column.cards[card_index])
 
-            if column_is_selected and not slots_spinning:
+            if is_selected and not slots_spinning:
                 rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.5)
                 # Arrows
                 print_at(
@@ -163,6 +162,7 @@ def main():
     ctx = Context(
         term=term,
         screen=screen,
+        game_state=GameState.READY_TO_SPIN_SLOTS,
         slots=Slots(
             columns=[
                 Column(0, foo),
@@ -176,7 +176,7 @@ def main():
     for column in ctx.slots.columns:
         random.shuffle(column.cards)
 
-    print_at = partial(verbose_print_at, term, screen)
+    # print_at = partial(verbose_print_at, term, screen)
     fps_limiter = create_fps_limiter(144)
 
     with (
@@ -184,15 +184,27 @@ def main():
         term.hidden_cursor(),
         term.fullscreen(),
     ):
-        delta_time: float = 0.01666
+        dt: float = 0.01666
 
         while True:
-            tick_outcome: ProgramStatus = tick(
-                ctx,
-                delta_time,
-                print_at,
-            )
-            if tick_outcome == ProgramStatus.EXIT:
-                break
+            if input := map_input(term.inkey(0.0)):
+                action = resolve_input(ctx, input)
 
-            delta_time = fps_limiter()
+                if action == Action.QUIT_GAME:
+                    exit()
+
+                if action == Action.SPIN_SLOTS:
+                    print("spinner")
+                    ctx.game_state = GameState.SPINNING_SLOTS
+
+            tick_slots(ctx, dt)
+            _ = render_slots(ctx)
+
+            dt = fps_limiter()
+
+            # tick_outcome: ProgramStatus = tick(
+            #     ctx,
+            #     delta_time,
+            #     print_at,
+            # )
+            #     break

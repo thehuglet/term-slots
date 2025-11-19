@@ -63,9 +63,7 @@ RANK_STR: dict[Rank, str] = {
     Rank.R_K: "K",
 }
 
-FULL_DECK: list[PlayingCard] = [
-    PlayingCard(suit, rank) for suit in Suit for rank in Rank
-]
+FULL_DECK: list[PlayingCard] = [PlayingCard(suit, rank) for suit in Suit for rank in Rank]
 
 
 def card_rich_text(card: PlayingCard) -> RichText:

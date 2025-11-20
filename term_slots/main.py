@@ -7,7 +7,7 @@ from term_slots.context import Context
 from term_slots.ezterm import (
     BACKGROUND_COLOR,
     RGB,
-    DrawInstruction,
+    DrawCall,
     FPSCounter,
     RichText,
     Screen,
@@ -21,7 +21,7 @@ from term_slots.ezterm import (
 )
 from term_slots.game_state import GameState
 from term_slots.hand import Hand
-from term_slots.input import Action, map_input, resolve_input
+from term_slots.input import Action, get_action, map_input, resolve_action
 from term_slots.playing_card import (
     FULL_DECK,
     PlayingCard,
@@ -33,16 +33,32 @@ from term_slots.slots import (
     Column,
     Slots,
     render_slots,
-    start_slots_spin,
     tick_slots_spin,
     wrap_cursor,
 )
 
-# def tick(dt: float, ctx: Context, term: Terminal, screen: Screen):
+
+def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config):
+    draw_calls: list[DrawCall] = []
+
+    if input := map_input(term.inkey(timeout=0.0)):
+        if action := get_action(ctx, input):
+            resolve_action(ctx, action, config)
+
+    # --- Game logic ---
+
+    # --- Rendering ---
+
+    # Debugging line
+    draw_calls.append(DrawCall(35, 0, ctx.debug_text))
+
+    for draw_call in draw_calls:
+        print_at(term, screen, draw_call.x, draw_call.y, draw_call.rich_text)
+    flush_diffs(ctx.term, buffer_diff(ctx.screen))
 
 
 def main():
-    aces_of_spades_deck = [PlayingCard(Suit.SPADE, Rank.ACE) for _ in range(52)]
+    # aces_of_spades_deck = [PlayingCard(Suit.SPADE, Rank.ACE) for _ in range(52)]
     term = Terminal()
     screen = Screen(term.width, term.height)
 
@@ -80,57 +96,8 @@ def main():
         dt: float = 0.01666
 
         while True:
-            # tick(dt, ctx, term, screen)
+            tick(dt, ctx, term, screen, config)
             dt *= config.game_speed
-
-            if input := map_input(term.inkey(0.0)):
-                action: Action | None = resolve_input(ctx, input)
-
-                if action == Action.QUIT_GAME:
-                    exit()
-
-                elif action == Action.SPIN_SLOTS:
-                    start_slots_spin(
-                        ctx,
-                        config.slots_spin_duration_sec,
-                        config.slots_spin_duration_stagger_sec_min,
-                        config.slots_spin_duration_stagger_ratio,
-                        config.slots_spin_duration_stagger_diminishing_ratio,
-                    )
-                    ctx.game_state = GameState.SPINNING_SLOTS
-
-                elif action == Action.SLOTS_MOVE_SELECTION_LEFT:
-                    ctx.slots.selected_column_index -= 1
-
-                elif action == Action.SLOTS_MOVE_SELECTION_RIGHT:
-                    ctx.slots.selected_column_index += 1
-
-                elif action == Action.SLOTS_PICK_CARD:
-                    selected_column: Column = ctx.slots.columns[ctx.slots.selected_column_index]
-                    selected_card_index: int = wrap_cursor(
-                        int(selected_column.cursor), selected_column.cards
-                    )
-
-                    ctx.hand.cards.append(selected_column.cards[selected_card_index])
-                    ctx.game_state = GameState.READY_TO_SPIN_SLOTS
-
-                elif action == Action.FOCUS_SLOTS:
-                    ctx.game_state = GameState.READY_TO_SPIN_SLOTS
-
-                elif action == Action.FOCUS_HAND:
-                    ctx.game_state = GameState.SELECTING_HAND_CARDS
-
-                elif action == Action.HAND_MOVE_SELECTION_LEFT:
-                    ctx.hand.cursor_pos -= 1
-
-                elif action == Action.HAND_MOVE_SELECTION_RIGHT:
-                    ctx.hand.cursor_pos += 1
-
-                elif action == Action.HAND_SELECT_CARD:
-                    ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
-
-                elif action == Action.HAND_DESELECT_CARD:
-                    ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
 
             # --- Logic tick ---
             if ctx.game_state == GameState.SPINNING_SLOTS:
@@ -142,14 +109,14 @@ def main():
             update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
             # --- Rendering ---
-            draw_instructions: list[DrawInstruction] = []
+            draw_instructions: list[DrawCall] = []
 
             draw_instructions.extend(render_slots(ctx, 5, 6))
 
             fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
             x = ctx.screen.width - len(fps_text) - 1
             draw_instructions.append(
-                DrawInstruction(
+                DrawCall(
                     x,
                     0,
                     RichText(
@@ -160,7 +127,7 @@ def main():
             )
 
             draw_instructions.append(
-                DrawInstruction(
+                DrawCall(
                     0,
                     0,
                     RichText(
@@ -182,7 +149,7 @@ def main():
             # Draw hand background
             for row in range(7):
                 draw_instructions.append(
-                    DrawInstruction(
+                    DrawCall(
                         x - 2,
                         y - 2 + row,
                         RichText(" " * 43, bg_color=lerp_rgb(RGB.GREEN, RGB.WHITE, 0.4) * 0.1),
@@ -195,7 +162,7 @@ def main():
 
                 for row in range(3):
                     draw_instructions.append(
-                        DrawInstruction(
+                        DrawCall(
                             card_slot_x,
                             y + row,
                             RichText("   ", bg_color=lerp_rgb(RGB.GREEN, RGB.WHITE, 0.4) * 0.25),
@@ -222,7 +189,7 @@ def main():
                         selected_y_offset += 1
 
                     draw_instructions.append(
-                        DrawInstruction(
+                        DrawCall(
                             x + n * 4,
                             y + y_offset - selected_y_offset,
                             rich_text,
@@ -236,7 +203,7 @@ def main():
                         rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.45)
 
                         draw_instructions.append(
-                            DrawInstruction(
+                            DrawCall(
                                 x + n * 4,
                                 y + 3,
                                 RichText(" ▴ ", lerp_rgb(RGB.WHITE, RGB.GOLD, 0.45)),
@@ -245,20 +212,20 @@ def main():
 
             card_count = len(ctx.hand.cards)
             draw_instructions.append(
-                DrawInstruction(x + 35, y + 4, f"{card_count}/{max_card_count}".rjust(5))
+                DrawCall(x + 35, y + 4, f"{card_count}/{max_card_count}".rjust(5))
             )
 
-            for instruction in draw_instructions:
-                print_at(term, screen, instruction.x, instruction.y, instruction.rich_text)
+            # for instruction in draw_instructions:
+            #     print_at(term, screen, instruction.x, instruction.y, instruction.rich_text)
 
-            # Special debug line
-            print_at(
-                term,
-                screen,
-                35,
-                0,
-                RichText(ctx.debug_text),
-            )
+            # # Special debug line
+            # print_at(
+            #     term,
+            #     screen,
+            #     35,
+            #     0,
+            #     RichText(ctx.debug_text),
+            # )
 
-            flush_diffs(ctx.term, buffer_diff(ctx.screen))
+            # flush_diffs(ctx.term, buffer_diff(ctx.screen))
             dt = fps_limiter()

@@ -1,8 +1,9 @@
 import random
 from dataclasses import dataclass, field
 
+from term_slots.config import Config
 from term_slots.context import Context
-from term_slots.ezterm import RGB, DrawInstruction, RichText, lerp_rgb
+from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb
 from term_slots.game_state import GameState
 from term_slots.playing_card import PlayingCard, card_rich_text
 
@@ -25,28 +26,47 @@ class Column:
     spin_time_remaining: float = 0.0
     # finish_flash_timer: float = 0.0
     spin_speed: float = 0.0
+    spin_speed
 
 
-def start_slots_spin(
-    ctx: Context,
-    duration_sec: float,
-    duration_stagger_sec_min: float,
-    duration_stagger_ratio: float,
-    duration_stagger_diminishing_ratio: float,
-):
-    base_increment = duration_sec * duration_stagger_ratio
-    r = duration_stagger_diminishing_ratio
+# def start_slots_spin(
+#     ctx: Context,
+#     duration_sec: float,
+#     duration_stagger_sec_min: float,
+#     duration_stagger_ratio: float,
+#     duration_stagger_diminishing_ratio: float,
+# ):
+#     base_increment = duration_sec * duration_stagger_ratio
+#     r = duration_stagger_diminishing_ratio
 
-    for n, column in enumerate(ctx.slots.columns):
-        if n == 0:
-            stagger = 0
-        else:
-            # total extra time = sum of all previous per-column increments, clamped to min
-            stagger = sum(max(base_increment * (r**i), duration_stagger_sec_min) for i in range(n))
+#     for n, column in enumerate(ctx.slots.columns):
+#         if n == 0:
+#             stagger = 0
+#         else:
+#             # total extra time = sum of all previous per-column increments, clamped to min
+#             stagger = sum(max(base_increment * (r**i), duration_stagger_sec_min) for i in range(n))
 
-        total_duration = duration_sec + stagger
-        column.spin_duration = total_duration
-        column.spin_time_remaining = total_duration
+#         total_duration = duration_sec + stagger
+#         column.spin_duration = total_duration
+#         column.spin_time_remaining = total_duration
+
+
+def calc_column_spin_duration_sec(col_index: int, config: Config) -> float:
+    duration: float = config.slots_spin_duration_sec
+    stagger_ratio: float = config.slots_spin_duration_stagger_ratio
+    min_stagger_time: float = config.slots_spin_duration_stagger_sec_min
+
+    base_increment: float = duration * stagger_ratio
+
+    if col_index == 0:
+        stagger = 0
+    else:
+        # total extra time = sum of all previous per-column increments, clamped to min
+        stagger = sum(
+            max(base_increment * (stagger_ratio**i), min_stagger_time) for i in range(col_index)
+        )
+
+    return duration + stagger
 
 
 def tick_slots_spin(ctx: Context, dt: float, max_spin_speed: float) -> bool:
@@ -84,8 +104,8 @@ def tick_slots_spin(ctx: Context, dt: float, max_spin_speed: float) -> bool:
     return False
 
 
-def render_slots(ctx: Context, x: int, y: int) -> list[DrawInstruction]:
-    draw_instructions: list[DrawInstruction] = []
+def render_slots(ctx: Context, x: int, y: int) -> list[DrawCall]:
+    draw_instructions: list[DrawCall] = []
 
     spacing = 5
     # y = 6
@@ -95,7 +115,7 @@ def render_slots(ctx: Context, x: int, y: int) -> list[DrawInstruction]:
         is_selected: bool = ctx.slots.selected_column_index == n
 
         col_x = x + n * spacing
-        instructions: list[DrawInstruction] = render_column(
+        instructions: list[DrawCall] = render_column(
             col_x, y, column, is_selected, any_column_spinning, ctx.game_state
         )
         draw_instructions.extend(instructions)
@@ -110,8 +130,8 @@ def render_column(
     is_selected: bool,
     any_column_spinning: bool,
     game_state: GameState,
-) -> list[DrawInstruction]:
-    draw_instructions: list[DrawInstruction] = []
+) -> list[DrawCall]:
+    draw_instructions: list[DrawCall] = []
 
     for row_offset in range(-SLOT_COLUMN_NEIGHBOR_COUNT, SLOT_COLUMN_NEIGHBOR_COUNT + 1):
         is_cursor_row = row_offset == 0
@@ -123,14 +143,14 @@ def render_column(
             rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.5)
             # Arrows
             draw_instructions.append(
-                DrawInstruction(
+                DrawCall(
                     x,
                     y + SLOT_COLUMN_NEIGHBOR_COUNT + 1,
                     RichText(" ▴ ", RGB.GOLD * 0.4),
                 )
             )
             draw_instructions.append(
-                DrawInstruction(
+                DrawCall(
                     x,
                     y - SLOT_COLUMN_NEIGHBOR_COUNT - 1,
                     RichText(" ▾ ", RGB.GOLD * 0.4),
@@ -170,7 +190,7 @@ def render_column(
             rich_text.bg_color *= unfocussed_alpha_modifier
             rich_text.text_color *= unfocussed_alpha_modifier
 
-        draw_instructions.append(DrawInstruction(x, y + row_offset, rich_text))
+        draw_instructions.append(DrawCall(x, y + row_offset, rich_text))
 
     return draw_instructions
 

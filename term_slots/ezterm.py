@@ -91,7 +91,7 @@ class Screen:
 
 
 @dataclass
-class DrawInstruction:
+class DrawCall:
     x: int
     y: int
     rich_text: str | RichText | list[str | RichText]
@@ -325,12 +325,12 @@ def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:
 #     screen.new_buffer.styles[:, :] = bg_style
 
 
-def render_fps_counter(x: int, y: int, fps_counter: FPSCounter) -> list[DrawInstruction]:
-    draw_instructions: list[DrawInstruction] = []
+def render_fps_counter(x: int, y: int, fps_counter: FPSCounter) -> list[DrawCall]:
+    draw_instructions: list[DrawCall] = []
 
     fps_text = f"{fps_counter.ema:5.1f} FPS"
     # x = max(0, ctx.screen.width - len(fps_text) - 1)
     # print_at(x, y, RichText(fps_text, RGB.WHITE))
-    draw_instructions.append(DrawInstruction(x, y, RichText(fps_text, RGB.WHITE)))
+    draw_instructions.append(DrawCall(x, y, RichText(fps_text, RGB.WHITE)))
 
     return draw_instructions

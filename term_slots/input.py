@@ -2,8 +2,10 @@ from enum import Enum, auto
 
 from blessed.keyboard import Keystroke
 
+from term_slots import config
 from term_slots.context import Context
 from term_slots.game_state import GameState
+from term_slots.slots import Column, calc_column_spin_duration_sec, start_slots_spin, wrap_cursor
 
 
 class Input(Enum):
@@ -53,7 +55,7 @@ def map_input(keystroke: Keystroke) -> Input | None:
     return None
 
 
-def resolve_input(ctx: Context, input: Input) -> Action | None:
+def get_action(ctx: Context, input: Input) -> Action | None:
     if input == Input.QUIT:
         return Action.QUIT_GAME
 
@@ -102,3 +104,60 @@ def resolve_input(ctx: Context, input: Input) -> Action | None:
             return Action.HAND_DESELECT_CARD
 
     return None
+
+
+def resolve_action(ctx: Context, action: Action, config: config.Config):
+    """This mutates `ctx` directly"""
+
+    match action:
+        case Action.QUIT_GAME:
+            exit()
+
+        case Action.SPIN_SLOTS:
+            for col_index, col in enumerate(ctx.slots.columns):
+                # start_slots_spin(
+                #     ctx,
+                #     config.slots_spin_duration_sec,
+                #     config.slots_spin_duration_stagger_sec_min,
+                #     config.slots_spin_duration_stagger_ratio,
+                #     config.slots_spin_duration_stagger_diminishing_ratio,
+                # )
+                spin_duration = calc_column_spin_duration_sec(col_index, config)
+
+                col.spin_duration = spin_duration
+                col.spin_time_remaining = spin_duration
+
+            ctx.game_state = GameState.SPINNING_SLOTS
+
+        case Action.SLOTS_MOVE_SELECTION_LEFT:
+            ctx.slots.selected_column_index -= 1
+
+        case Action.SLOTS_MOVE_SELECTION_RIGHT:
+            ctx.slots.selected_column_index += 1
+
+        case Action.SLOTS_PICK_CARD:
+            selected_column: Column = ctx.slots.columns[ctx.slots.selected_column_index]
+            selected_card_index: int = wrap_cursor(
+                int(selected_column.cursor), selected_column.cards
+            )
+
+            ctx.hand.cards.append(selected_column.cards[selected_card_index])
+            ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+        case Action.FOCUS_SLOTS:
+            ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+        case Action.FOCUS_HAND:
+            ctx.game_state = GameState.SELECTING_HAND_CARDS
+
+        case Action.HAND_MOVE_SELECTION_LEFT:
+            ctx.hand.cursor_pos -= 1
+
+        case Action.HAND_MOVE_SELECTION_RIGHT:
+            ctx.hand.cursor_pos += 1
+
+        case Action.HAND_SELECT_CARD:
+            ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
+
+        case Action.HAND_DESELECT_CARD:
+            ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)

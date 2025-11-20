@@ -1,1 +1,1 @@
-wt powershell uv run python -m horny_app
+wt powershell uv run python -m term_slots

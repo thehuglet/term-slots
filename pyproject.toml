@@ -1,5 +1,5 @@
 [project]
-name = "horny-app"
+name = "term-slots"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -11,7 +11,7 @@ dependencies = [
 
 
 [project.scripts]
-main = "horny_app.main:main"
+main = "term_slots.main:main"
 
 [tool.uv]
 package = true

@@ -3,12 +3,11 @@ from typing import TYPE_CHECKING
 
 from blessed import Terminal
 
-from horny_app.playing_card import PlayingCard
-
 if TYPE_CHECKING:
-    from horny_app.ezterm import FPSCounter, RichText, Screen
-    from horny_app.game_state import GameState
-    from horny_app.slots import Slots
+    from term_slots.ezterm import FPSCounter, RichText, Screen
+    from term_slots.game_state import GameState
+    from term_slots.hand import Hand
+    from term_slots.slots import Slots
 
 
 @dataclass
@@ -16,7 +15,7 @@ class Context:
     term: Terminal
     screen: Screen
     slots: Slots
-    cards_in_hand: list[PlayingCard]
+    hand: Hand
     game_state: GameState
     fps_counter: FPSCounter
     debug_text: str | RichText = ""

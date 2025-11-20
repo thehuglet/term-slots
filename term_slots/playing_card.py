@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import IntEnum
 
-from horny_app.ezterm import RGB, RichText
+from term_slots.ezterm import RGB, RichText
 
 
 class Suit(IntEnum):

@@ -1,10 +1,10 @@
 import random
 from dataclasses import dataclass, field
 
-from horny_app.context import Context
-from horny_app.ezterm import RGB, DrawInstruction, RichText, lerp_rgb
-from horny_app.game_state import GameState
-from horny_app.playing_card import PlayingCard, card_rich_text
+from term_slots.context import Context
+from term_slots.ezterm import RGB, DrawInstruction, RichText, lerp_rgb
+from term_slots.game_state import GameState
+from term_slots.playing_card import PlayingCard, card_rich_text
 
 SLOT_COLUMN_NEIGHBOR_COUNT = 3
 
@@ -119,7 +119,7 @@ def render_column(
         card_index = wrap_cursor(int(column.cursor + row_offset), column.cards)
         rich_text = card_rich_text(column.cards[card_index])
 
-        if is_selected and game_state == GameState.POST_SPIN_COLUMN_PICKING:
+        if is_selected and game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING:
             rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.5)
             # Arrows
             draw_instructions.append(
@@ -146,7 +146,6 @@ def render_column(
         # draw_instructions.append(DrawInstruction(x, 2, f"{column.spin_duration:2.1f}"))
 
         if column.spin_time_remaining:
-            # > HERE <
             seeded_random = random.Random(card_index)
             # alpha = seeded_random.uniform(0.85, 1.0)
             rich_text.bg_color *= seeded_random.uniform(0.85, 1.0)
@@ -155,6 +154,15 @@ def render_column(
                 rich_text.text_color,
                 seeded_random.uniform(0.0, 1.0),
             )
+
+        slots_focussed_game_states: list[GameState] = [
+            GameState.READY_TO_SPIN_SLOTS,
+            GameState.SPINNING_SLOTS,
+            GameState.SLOTS_POST_SPIN_COLUMN_PICKING,
+        ]
+        if game_state not in slots_focussed_game_states:
+            rich_text.bg_color *= 0.8
+            rich_text.text_color *= 0.8
 
         draw_instructions.append(DrawInstruction(x, y + row_offset, rich_text))
 

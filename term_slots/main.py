@@ -2,9 +2,9 @@ import random
 
 from blessed import Terminal
 
-from horny_app.config import Config
-from horny_app.context import Context
-from horny_app.ezterm import (
+from term_slots.config import Config
+from term_slots.context import Context
+from term_slots.ezterm import (
     BACKGROUND_COLOR,
     RGB,
     DrawInstruction,
@@ -19,17 +19,17 @@ from horny_app.ezterm import (
     print_at,
     update_fps_counter,
 )
-from horny_app.game_state import GameState
-from horny_app.input import Action, map_input, resolve_input
-from horny_app.playing_card import (
+from term_slots.game_state import GameState
+from term_slots.hand import Hand
+from term_slots.input import Action, map_input, resolve_input
+from term_slots.playing_card import (
     FULL_DECK,
     PlayingCard,
     Rank,
     Suit,
-    card_rich_text,
     card_rich_text_big,
 )
-from horny_app.slots import (
+from term_slots.slots import (
     Column,
     Slots,
     render_slots,
@@ -63,14 +63,17 @@ def main():
                 Column(0, FULL_DECK.copy()),
             ]
         ),
-        cards_in_hand=[],
+        hand=Hand(
+            cards=[],
+            cursor_pos=0,
+            selected_card_indexes=[],
+        ),
         fps_counter=FPSCounter(),
     )
 
     for column in ctx.slots.columns:
         random.shuffle(column.cards)
 
-    # print_at = partial(verbose_print_at, term, screen)
     fps_limiter = create_fps_limiter(144)
 
     with (
@@ -84,7 +87,7 @@ def main():
             dt *= config.game_speed
 
             if input := map_input(term.inkey(0.0)):
-                action = resolve_input(ctx, input)
+                action: Action | None = resolve_input(ctx, input)
 
                 if action == Action.QUIT_GAME:
                     exit()
@@ -111,15 +114,21 @@ def main():
                         int(selected_column.cursor), selected_column.cards
                     )
 
-                    ctx.cards_in_hand.append(selected_column.cards[selected_card_index])
+                    ctx.hand.cards.append(selected_column.cards[selected_card_index])
                     ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+                elif action == Action.FOCUS_SLOTS:
+                    ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+                elif action == Action.FOCUS_HAND:
+                    ctx.game_state = GameState.SELECTING_HAND_CARDS
 
             # --- Logic tick ---
             if ctx.game_state == GameState.SPINNING_SLOTS:
                 spin_finished = tick_slots_spin(ctx, dt, config.slots_max_spin_speed)
 
                 if spin_finished:
-                    ctx.game_state = GameState.POST_SPIN_COLUMN_PICKING
+                    ctx.game_state = GameState.SLOTS_POST_SPIN_COLUMN_PICKING
 
             update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
@@ -155,19 +164,14 @@ def main():
             fill_screen_background(ctx.term, ctx.screen, BACKGROUND_COLOR)
 
             # temp hand rendering
-            for n, card in enumerate(ctx.cards_in_hand):
+            for n, card in enumerate(ctx.hand.cards):
                 x = 5
                 y = 22
 
-                # if n % 2 == 0:
-                #     alpha_multiplier = 0.8
-                # else:
-                #     alpha_multiplier = 0.6
-                alpha_multiplier = 0.8
+                alpha_multiplier = 0.4
 
-                if n == 2:
-                    alpha_multiplier = 1.0
-                    y -= 1
+                if ctx.game_state == GameState.SELECTING_HAND_CARDS:
+                    alpha_multiplier = 0.8
 
                 rich_text_batch = card_rich_text_big(card)
 

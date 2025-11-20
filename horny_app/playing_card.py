@@ -12,19 +12,19 @@ class Suit(IntEnum):
 
 
 class Rank(IntEnum):
-    R_A = 1
-    R_2 = 2
-    R_3 = 3
-    R_4 = 4
-    R_5 = 5
-    R_6 = 6
-    R_7 = 7
-    R_8 = 8
-    R_9 = 9
-    R_10 = 10
-    R_J = 11
-    R_Q = 12
-    R_K = 13
+    N_2 = 2
+    N_3 = 3
+    N_4 = 4
+    N_5 = 5
+    N_6 = 6
+    N_7 = 7
+    N_8 = 8
+    N_9 = 9
+    N_10 = 10
+    JACK = 11
+    QUEEN = 12
+    KING = 13
+    ACE = 14
 
 
 @dataclass
@@ -48,19 +48,19 @@ SUIT_STR: dict[Suit, str] = {
 }
 
 RANK_STR: dict[Rank, str] = {
-    Rank.R_A: "A",
-    Rank.R_2: "2",
-    Rank.R_3: "3",
-    Rank.R_4: "4",
-    Rank.R_5: "5",
-    Rank.R_6: "6",
-    Rank.R_7: "7",
-    Rank.R_8: "8",
-    Rank.R_9: "9",
-    Rank.R_10: "10",
-    Rank.R_J: "J",
-    Rank.R_Q: "Q",
-    Rank.R_K: "K",
+    Rank.N_2: "2",
+    Rank.N_3: "3",
+    Rank.N_4: "4",
+    Rank.N_5: "5",
+    Rank.N_6: "6",
+    Rank.N_7: "7",
+    Rank.N_8: "8",
+    Rank.N_9: "9",
+    Rank.N_10: "10",
+    Rank.JACK: "J",
+    Rank.QUEEN: "Q",
+    Rank.KING: "K",
+    Rank.ACE: "A",
 }
 
 FULL_DECK: list[PlayingCard] = [PlayingCard(suit, rank) for suit in Suit for rank in Rank]
@@ -72,8 +72,6 @@ def card_rich_text(card: PlayingCard) -> RichText:
     rank_str = RANK_STR[card.rank]
 
     text = suit_str + rank_str.rjust(2)
-    # Debug for only showing the bg
-    # text = "   "
 
     return RichText(
         text=text,
@@ -81,3 +79,43 @@ def card_rich_text(card: PlayingCard) -> RichText:
         bg_color=RGB.WHITE * 0.8,
         bold=True,
     )
+
+
+def card_rich_text_big(card: PlayingCard) -> list[RichText]:
+    suit_str = SUIT_STR[card.suit]
+    suit_color = SUIT_COLOR[card.suit]
+    rank_str = RANK_STR[card.rank]
+    bg_color = RGB.WHITE * 0.8
+
+    # Choose pattern based on rank
+    if card.rank == Rank.ACE:
+        pattern = [
+            "<< ",
+            " S ",
+            " >>",
+        ]
+    elif card.rank == Rank.N_2:
+        pattern = [
+            "<<S",
+            "   ",
+            "S>>",
+        ]
+    else:
+        pattern = [
+            "<<S",
+            " S ",
+            "S>>",
+        ]
+
+    output: list[RichText] = []
+
+    for pattern_row in pattern:
+        text_row = pattern_row
+
+        text_row = text_row.replace("<<", rank_str.ljust(2))
+        text_row = text_row.replace(">>", rank_str.rjust(2))
+        text_row = text_row.replace("S", suit_str)
+
+        output.append(RichText(text_row, suit_color, bg_color))
+
+    return output

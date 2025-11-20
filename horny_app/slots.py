@@ -23,35 +23,58 @@ class Column:
     cards: list[PlayingCard] = field(default_factory=list)
     spin_duration: float = 0.0
     spin_time_remaining: float = 0.0
-    finish_flash_timer: float = 0.0
+    # finish_flash_timer: float = 0.0
+    spin_speed: float = 0.0
 
 
-def start_slots_spin(ctx: Context):
+def start_slots_spin(
+    ctx: Context,
+    duration_sec: float,
+    duration_stagger_sec_min: float,
+    duration_stagger_ratio: float,
+    duration_stagger_diminishing_ratio: float,
+):
+    r = duration_stagger_diminishing_ratio
+
     for n, column in enumerate(ctx.slots.columns):
-        column.spin_duration = 1.5 + n * 0.5
-        column.spin_time_remaining = column.spin_duration
+        if n == 0:
+            staggered_duration = 0
+        else:
+            staggered_duration = 0
+            # initial increment is duration_sec * duration_stagger_ratio
+            increment = duration_sec * duration_stagger_ratio
+            for i in range(n):
+                # clamp the increment to min stagger
+                current_increment = max(increment * (r**i), duration_stagger_sec_min)
+                staggered_duration += current_increment
+
+        total_duration = duration_sec + staggered_duration
+        column.spin_duration = total_duration
+        column.spin_time_remaining = total_duration
 
 
-def tick_slots_spin(ctx: Context, dt: float) -> bool:
+def tick_slots_spin(ctx: Context, dt: float, max_spin_speed: float) -> bool:
     """Return `True` once the spinning finishes or if it never starts."""
 
     for n, column in enumerate(ctx.slots.columns):
         if not column.spin_time_remaining:
             continue
 
-        spin_speed = calc_spin_speed(
+        column.spin_speed = calc_spin_speed(
             column.spin_duration,
             column.spin_time_remaining,
             snap_threshold=0.15,
+            max_spin_speed=max_spin_speed,
         )
-        column.cursor -= spin_speed * dt
+
+        column.cursor -= column.spin_speed * dt
         column.spin_time_remaining = max(0.0, column.spin_time_remaining - dt)
 
-        if spin_speed == 0.0:
+        if column.spin_speed == 0.0:
             column.spin_time_remaining = 0.0
 
         is_last_column: bool = n == len(ctx.slots.columns) - 1
-        if is_last_column and spin_speed == 0:
+        if is_last_column and column.spin_speed == 0:
             # Last column stopped == Entire slots stopped
             return True
 
@@ -62,19 +85,18 @@ def tick_slots_spin(ctx: Context, dt: float) -> bool:
     return False
 
 
-def render_slots(ctx: Context) -> list[DrawInstruction]:
+def render_slots(ctx: Context, x: int, y: int) -> list[DrawInstruction]:
     draw_instructions: list[DrawInstruction] = []
 
     spacing = 5
-    y = 5
+    # y = 6
     any_column_spinning: bool = ctx.game_state == GameState.SPINNING_SLOTS
 
     for n, column in enumerate(ctx.slots.columns):
-        x = 5 + n * spacing
         is_selected: bool = ctx.slots.selected_column_index == n
 
         instructions: list[DrawInstruction] = render_column(
-            x, y, column, is_selected, any_column_spinning, ctx.game_state
+            x + n * spacing, y, column, is_selected, any_column_spinning, ctx.game_state
         )
         draw_instructions.extend(instructions)
 
@@ -121,13 +143,17 @@ def render_column(
             rich_text.bg_color *= alpha
             rich_text.text_color *= alpha
 
+        # draw_instructions.append(DrawInstruction(x, 2, f"{column.spin_duration:2.1f}"))
+
         if column.spin_time_remaining:
-            alpha = random.uniform(0.85, 1.0)
-            rich_text.bg_color *= random.uniform(0.85, 1.0)
+            # > HERE <
+            seeded_random = random.Random(card_index)
+            # alpha = seeded_random.uniform(0.85, 1.0)
+            rich_text.bg_color *= seeded_random.uniform(0.85, 1.0)
             rich_text.text_color = lerp_rgb(
                 rich_text.bg_color,
                 rich_text.text_color,
-                random.uniform(0.0, 1.0),
+                seeded_random.uniform(0.0, 1.0),
             )
 
         draw_instructions.append(DrawInstruction(x, y + row_offset, rich_text))
@@ -136,11 +162,8 @@ def render_column(
 
 
 def calc_spin_speed(
-    duration: float,
-    time_remaining: float,
-    snap_threshold: float,
+    duration: float, time_remaining: float, snap_threshold: float, max_spin_speed: float
 ) -> float:
-    max_speed = 60.0
     exponent = 6
 
     time_normalized = time_remaining / duration
@@ -149,7 +172,7 @@ def calc_spin_speed(
     if time_normalized <= snap_threshold:
         return 0.0
 
-    return max_speed * (1 - (1 - time_normalized) ** exponent)
+    return max_spin_speed * (1 - (1 - time_normalized) ** exponent)
 
 
 def wrap_cursor(cursor: int, cards: list[PlayingCard]):

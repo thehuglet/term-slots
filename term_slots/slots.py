@@ -95,8 +95,9 @@ def render_slots(ctx: Context, x: int, y: int) -> list[DrawInstruction]:
     for n, column in enumerate(ctx.slots.columns):
         is_selected: bool = ctx.slots.selected_column_index == n
 
+        col_x = x + n * spacing
         instructions: list[DrawInstruction] = render_column(
-            x + n * spacing, y, column, is_selected, any_column_spinning, ctx.game_state
+            col_x, y, column, is_selected, any_column_spinning, ctx.game_state
         )
         draw_instructions.extend(instructions)
 

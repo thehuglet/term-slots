@@ -26,6 +26,8 @@ class Action(Enum):
     FOCUS_HAND = auto()
     HAND_MOVE_SELECTION_LEFT = auto()
     HAND_MOVE_SELECTION_RIGHT = auto()
+    HAND_SELECT_CARD = auto()
+    HAND_DESELECT_CARD = auto()
 
 
 KEYMAP: dict[str, Input] = {
@@ -65,31 +67,38 @@ def resolve_input(ctx: Context, input: Input) -> Action | None:
             return Action.FOCUS_HAND
 
     elif ctx.game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING:
-        is_first_column_selected: bool = ctx.slots.selected_column_index == 0
-        is_last_column_selected: bool = (
+        first_column_is_selected: bool = ctx.slots.selected_column_index == 0
+        last_column_is_selected: bool = (
             ctx.slots.selected_column_index == len(ctx.slots.columns) - 1
         )
 
         if input == Input.CONFIRM:
             return Action.SLOTS_PICK_CARD
 
-        elif input == Input.LEFT and not is_first_column_selected:
+        elif input == Input.LEFT and not first_column_is_selected:
             return Action.SLOTS_MOVE_SELECTION_LEFT
 
-        elif input == Input.RIGHT and not is_last_column_selected:
+        elif input == Input.RIGHT and not last_column_is_selected:
             return Action.SLOTS_MOVE_SELECTION_RIGHT
 
     if ctx.game_state == GameState.SELECTING_HAND_CARDS:
-        is_cursor_on_first_card: bool = ctx.hand.cursor_pos == 0
-        is_cursor_on_last_card: bool = ctx.hand.cursor_pos == len(ctx.hand.cards) - 1
+        cursor_is_on_first_card: bool = ctx.hand.cursor_pos == 0
+        cursor_is_on_last_card: bool = ctx.hand.cursor_pos == len(ctx.hand.cards) - 1
+        card_at_cursor_is_selected: bool = ctx.hand.cursor_pos in ctx.hand.selected_card_indexes
 
         if input == Input.SWAP:
             return Action.FOCUS_SLOTS
 
-        if input == Input.LEFT and is_cursor_on_first_card:
+        if input == Input.LEFT and not cursor_is_on_first_card:
             return Action.HAND_MOVE_SELECTION_LEFT
 
-        elif input == Input.RIGHT and is_cursor_on_last_card:
+        elif input == Input.RIGHT and not cursor_is_on_last_card:
             return Action.HAND_MOVE_SELECTION_RIGHT
+
+        elif input == Input.UP and not card_at_cursor_is_selected:
+            return Action.HAND_SELECT_CARD
+
+        elif input == Input.DOWN and card_at_cursor_is_selected:
+            return Action.HAND_DESELECT_CARD
 
     return None

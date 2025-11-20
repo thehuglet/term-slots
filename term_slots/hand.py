@@ -7,4 +7,4 @@ from term_slots.playing_card import PlayingCard
 class Hand:
     cards: list[PlayingCard]
     cursor_pos: int
-    selected_card_indexes: list[int]
+    selected_card_indexes: set[int]

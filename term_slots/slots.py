@@ -34,21 +34,17 @@ def start_slots_spin(
     duration_stagger_ratio: float,
     duration_stagger_diminishing_ratio: float,
 ):
+    base_increment = duration_sec * duration_stagger_ratio
     r = duration_stagger_diminishing_ratio
 
     for n, column in enumerate(ctx.slots.columns):
         if n == 0:
-            staggered_duration = 0
+            stagger = 0
         else:
-            staggered_duration = 0
-            # initial increment is duration_sec * duration_stagger_ratio
-            increment = duration_sec * duration_stagger_ratio
-            for i in range(n):
-                # clamp the increment to min stagger
-                current_increment = max(increment * (r**i), duration_stagger_sec_min)
-                staggered_duration += current_increment
+            # total extra time = sum of all previous per-column increments, clamped to min
+            stagger = sum(max(base_increment * (r**i), duration_stagger_sec_min) for i in range(n))
 
-        total_duration = duration_sec + staggered_duration
+        total_duration = duration_sec + stagger
         column.spin_duration = total_duration
         column.spin_time_remaining = total_duration
 
@@ -56,8 +52,11 @@ def start_slots_spin(
 def tick_slots_spin(ctx: Context, dt: float, max_spin_speed: float) -> bool:
     """Return `True` once the spinning finishes or if it never starts."""
 
+    columns_finished: int = 0
+
     for n, column in enumerate(ctx.slots.columns):
         if not column.spin_time_remaining:
+            columns_finished += 1
             continue
 
         column.spin_speed = calc_spin_speed(
@@ -73,14 +72,14 @@ def tick_slots_spin(ctx: Context, dt: float, max_spin_speed: float) -> bool:
         if column.spin_speed == 0.0:
             column.spin_time_remaining = 0.0
 
-        is_last_column: bool = n == len(ctx.slots.columns) - 1
-        if is_last_column and column.spin_speed == 0:
-            # Last column stopped == Entire slots stopped
-            return True
+    if columns_finished == len(ctx.slots.columns):
+        return True
 
     if not ctx.slots.columns:
         # No columns -> Case where it never starts
         return True
+
+    # ctx.debug_text = f"{columns_finished}"
 
     return False
 
@@ -138,7 +137,11 @@ def render_column(
                 )
             )
 
-        if not is_cursor_row:
+        if is_cursor_row:
+            alpha = 0.9
+            rich_text.bg_color *= alpha
+            rich_text.text_color *= alpha
+        else:
             # Fade away dimming of neighbors
             alpha = abs(1.0 / row_offset * 0.3)
             rich_text.bg_color *= alpha
@@ -162,8 +165,10 @@ def render_column(
             GameState.SLOTS_POST_SPIN_COLUMN_PICKING,
         ]
         if game_state not in slots_focussed_game_states:
-            rich_text.bg_color *= 0.8
-            rich_text.text_color *= 0.8
+            unfocussed_alpha_modifier = 0.5 * (abs(row_offset) + 1) * 0.4
+            # unfocussed_alpha_modifier = 0.3
+            rich_text.bg_color *= unfocussed_alpha_modifier
+            rich_text.text_color *= unfocussed_alpha_modifier
 
         draw_instructions.append(DrawInstruction(x, y + row_offset, rich_text))
 

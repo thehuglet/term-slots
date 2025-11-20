@@ -76,7 +76,7 @@ def card_rich_text(card: PlayingCard) -> RichText:
     return RichText(
         text=text,
         text_color=suit_color,
-        bg_color=RGB.WHITE * 0.8,
+        bg_color=RGB.WHITE * 0.9,
         bold=True,
     )
 
@@ -85,7 +85,7 @@ def card_rich_text_big(card: PlayingCard) -> list[RichText]:
     suit_str = SUIT_STR[card.suit]
     suit_color = SUIT_COLOR[card.suit]
     rank_str = RANK_STR[card.rank]
-    bg_color = RGB.WHITE * 0.8
+    bg_color = RGB.WHITE * 0.9
 
     # Choose pattern based on rank
     if card.rank == Rank.ACE:
@@ -116,6 +116,6 @@ def card_rich_text_big(card: PlayingCard) -> list[RichText]:
         text_row = text_row.replace(">>", rank_str.rjust(2))
         text_row = text_row.replace("S", suit_str)
 
-        output.append(RichText(text_row, suit_color, bg_color))
+        output.append(RichText(text_row, suit_color, bg_color, bold=True))
 
     return output

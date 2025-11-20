@@ -38,6 +38,8 @@ from term_slots.slots import (
     wrap_cursor,
 )
 
+# def tick(dt: float, ctx: Context, term: Terminal, screen: Screen):
+
 
 def main():
     aces_of_spades_deck = [PlayingCard(Suit.SPADE, Rank.ACE) for _ in range(52)]
@@ -52,12 +54,6 @@ def main():
         game_state=GameState.READY_TO_SPIN_SLOTS,
         slots=Slots(
             columns=[
-                Column(0, aces_of_spades_deck),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
@@ -66,7 +62,7 @@ def main():
         hand=Hand(
             cards=[],
             cursor_pos=0,
-            selected_card_indexes=[],
+            selected_card_indexes=set(),
         ),
         fps_counter=FPSCounter(),
     )
@@ -84,6 +80,7 @@ def main():
         dt: float = 0.01666
 
         while True:
+            # tick(dt, ctx, term, screen)
             dt *= config.game_speed
 
             if input := map_input(term.inkey(0.0)):
@@ -122,6 +119,18 @@ def main():
 
                 elif action == Action.FOCUS_HAND:
                     ctx.game_state = GameState.SELECTING_HAND_CARDS
+
+                elif action == Action.HAND_MOVE_SELECTION_LEFT:
+                    ctx.hand.cursor_pos -= 1
+
+                elif action == Action.HAND_MOVE_SELECTION_RIGHT:
+                    ctx.hand.cursor_pos += 1
+
+                elif action == Action.HAND_SELECT_CARD:
+                    ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
+
+                elif action == Action.HAND_DESELECT_CARD:
+                    ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
 
             # --- Logic tick ---
             if ctx.game_state == GameState.SPINNING_SLOTS:
@@ -163,35 +172,93 @@ def main():
 
             fill_screen_background(ctx.term, ctx.screen, BACKGROUND_COLOR)
 
+            ctx.debug_text = f"{ctx.hand.cursor_pos}"
+
             # temp hand rendering
+            x = 5
+            y = 22
+            max_card_count = 10
+
+            # Draw hand background
+            for row in range(7):
+                draw_instructions.append(
+                    DrawInstruction(
+                        x - 2,
+                        y - 2 + row,
+                        RichText(" " * 43, bg_color=lerp_rgb(RGB.GREEN, RGB.WHITE, 0.4) * 0.1),
+                    )
+                )
+
+            # Card slot rendering
+            for n in range(max_card_count):
+                card_slot_x = x + n * 4
+
+                for row in range(3):
+                    draw_instructions.append(
+                        DrawInstruction(
+                            card_slot_x,
+                            y + row,
+                            RichText("   ", bg_color=lerp_rgb(RGB.GREEN, RGB.WHITE, 0.4) * 0.25),
+                        )
+                    )
+
+            # Actual card rendering
             for n, card in enumerate(ctx.hand.cards):
-                x = 5
-                y = 22
-
-                alpha_multiplier = 0.4
-
                 if ctx.game_state == GameState.SELECTING_HAND_CARDS:
                     alpha_multiplier = 0.8
+
+                else:
+                    alpha_multiplier = 0.4
 
                 rich_text_batch = card_rich_text_big(card)
 
                 for y_offset, rich_text in enumerate(rich_text_batch):
+                    assert rich_text.bg_color
                     rich_text.bg_color *= alpha_multiplier
                     rich_text.text_color *= alpha_multiplier
+
+                    selected_y_offset: int = 0
+                    if n in ctx.hand.selected_card_indexes:
+                        selected_y_offset += 1
 
                     draw_instructions.append(
                         DrawInstruction(
                             x + n * 4,
-                            y + y_offset,
+                            y + y_offset - selected_y_offset,
                             rich_text,
                         )
                     )
 
+                    if (
+                        ctx.game_state == GameState.SELECTING_HAND_CARDS
+                        and ctx.hand.cursor_pos == n
+                    ):
+                        rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.45)
+
+                        draw_instructions.append(
+                            DrawInstruction(
+                                x + n * 4,
+                                y + 3,
+                                RichText(" ▴ ", lerp_rgb(RGB.WHITE, RGB.GOLD, 0.45)),
+                            )
+                        )
+
+            card_count = len(ctx.hand.cards)
+            draw_instructions.append(
+                DrawInstruction(x + 35, y + 4, f"{card_count}/{max_card_count}".rjust(5))
+            )
+
             for instruction in draw_instructions:
                 print_at(term, screen, instruction.x, instruction.y, instruction.rich_text)
-            flush_diffs(ctx.term, buffer_diff(ctx.screen))
 
             # Special debug line
-            print_at(term, screen, 35, 23, ctx.debug_text)
+            print_at(
+                term,
+                screen,
+                35,
+                0,
+                RichText(ctx.debug_text),
+            )
 
+            flush_diffs(ctx.term, buffer_diff(ctx.screen))
             dt = fps_limiter()

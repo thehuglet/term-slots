@@ -1,9 +1,9 @@
-from dataclasses import dataclass
 from enum import Enum, auto
 
 from blessed.keyboard import Keystroke
 
-from horny_app.context import Context, GameState
+from horny_app.context import Context
+from horny_app.game_state import GameState
 
 
 class Input(Enum):
@@ -18,12 +18,9 @@ class Input(Enum):
 class Action(Enum):
     QUIT_GAME = auto()
     SPIN_SLOTS = auto()
-
-
-@dataclass
-class ValidatedInputAction:
-    input_action: Input
-    is_valid: bool
+    SLOTS_MOVE_SELECTION_LEFT = auto()
+    SLOTS_MOVE_SELECTION_RIGHT = auto()
+    SLOTS_PICK_CARD = auto()
 
 
 KEYMAP: dict[str, Input] = {
@@ -56,19 +53,19 @@ def resolve_input(ctx: Context, input: Input) -> Action | None:
         if input == Input.CONFIRM:
             return Action.SPIN_SLOTS
 
+    elif ctx.game_state == GameState.POST_SPIN_COLUMN_PICKING:
+        is_first_column_selected: bool = ctx.slots.selected_column_index == 0
+        is_last_column_selected: bool = (
+            ctx.slots.selected_column_index == len(ctx.slots.columns) - 1
+        )
+
+        if input == Input.LEFT and not is_first_column_selected:
+            return Action.SLOTS_MOVE_SELECTION_LEFT
+
+        elif input == Input.RIGHT and not is_last_column_selected:
+            return Action.SLOTS_MOVE_SELECTION_RIGHT
+
+        elif input == Input.CONFIRM:
+            return Action.SLOTS_PICK_CARD
+
     return None
-
-    # if input_action == Input.QUIT:
-    #     # Always valid
-    #     return ValidatedInputAction(input_action, True)
-
-    # if ctx.game_state == GameState.POST_SPIN_COLUMN_PICKING:
-    #     first_column_selected = ctx.slots.selected_column_index == 0
-    #     last_column_selected = ctx.slots.selected_column_index == len(ctx.slots.columns) - 1
-
-    #     if input_action == Input.LEFT and not first_column_selected:
-    #         return ValidatedInputAction(input_action, True)
-    #     if input_action == Input.RIGHT and not last_column_selected:
-    #         return ValidatedInputAction(input_action, True)
-
-    # return ValidatedInputAction(input_action, False)

@@ -91,7 +91,7 @@ class Screen:
 class DrawInstruction:
     x: int
     y: int
-    rich_text: RichText
+    rich_text: str | RichText | list[str | RichText]
 
 
 @dataclass
@@ -195,14 +195,14 @@ def create_fps_limiter(
     return wait_for_next_frame
 
 
-def update_fps_counter(fps: FPSCounter, dt: float) -> None:
+def update_fps_counter(fps_counter: FPSCounter, dt: float) -> None:
     if dt <= 0.0:
         return
     inst = 1.0 / dt
-    if fps.ema <= 0.0:
-        fps.ema = inst
+    if fps_counter.ema <= 0.0:
+        fps_counter.ema = inst
     else:
-        fps.ema = fps.ema * (1.0 - fps.alpha) + inst * fps.alpha
+        fps_counter.ema = fps_counter.ema * (1.0 - fps_counter.alpha) + inst * fps_counter.alpha
 
 
 def _make_style(term: Terminal, fg: RGB, bg: RGB | None, bold: bool) -> str:
@@ -285,3 +285,14 @@ def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:
 
     screen.new_buffer.chars[:, :] = " "
     screen.new_buffer.styles[:, :] = bg_style
+
+
+def render_fps_counter(x: int, y: int, fps_counter: FPSCounter) -> list[DrawInstruction]:
+    draw_instructions: list[DrawInstruction] = []
+
+    fps_text = f"{fps_counter.ema:5.1f} FPS"
+    # x = max(0, ctx.screen.width - len(fps_text) - 1)
+    # print_at(x, y, RichText(fps_text, RGB.WHITE))
+    draw_instructions.append(DrawInstruction(x, y, RichText(fps_text, RGB.WHITE)))
+
+    return draw_instructions

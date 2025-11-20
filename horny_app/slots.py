@@ -1,12 +1,9 @@
 import random
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from horny_app.context import Context
-
-from horny_app.context import GameState
-from horny_app.ezterm import RGB, DrawInstruction, PrintAtCallable, RichText, lerp_rgb
+from horny_app.context import Context
+from horny_app.ezterm import RGB, DrawInstruction, RichText, lerp_rgb
+from horny_app.game_state import GameState
 from horny_app.playing_card import PlayingCard, card_rich_text
 
 SLOT_COLUMN_NEIGHBOR_COUNT = 3
@@ -29,7 +26,15 @@ class Column:
     finish_flash_timer: float = 0.0
 
 
-def tick_slots(ctx: Context, dt: float):
+def start_slots_spin(ctx: Context):
+    for n, column in enumerate(ctx.slots.columns):
+        column.spin_duration = 1.5 + n * 0.5
+        column.spin_time_remaining = column.spin_duration
+
+
+def tick_slots_spin(ctx: Context, dt: float) -> bool:
+    """Return `True` once the spinning finishes or if it never starts."""
+
     for n, column in enumerate(ctx.slots.columns):
         if not column.spin_time_remaining:
             continue
@@ -45,6 +50,17 @@ def tick_slots(ctx: Context, dt: float):
         if spin_speed == 0.0:
             column.spin_time_remaining = 0.0
 
+        is_last_column: bool = n == len(ctx.slots.columns) - 1
+        if is_last_column and spin_speed == 0:
+            # Last column stopped == Entire slots stopped
+            return True
+
+    if not ctx.slots.columns:
+        # No columns -> Case where it never starts
+        return True
+
+    return False
+
 
 def render_slots(ctx: Context) -> list[DrawInstruction]:
     draw_instructions: list[DrawInstruction] = []
@@ -58,7 +74,7 @@ def render_slots(ctx: Context) -> list[DrawInstruction]:
         is_selected: bool = ctx.slots.selected_column_index == n
 
         instructions: list[DrawInstruction] = render_column(
-            x, y, column, any_column_spinning, is_selected
+            x, y, column, is_selected, any_column_spinning, ctx.game_state
         )
         draw_instructions.extend(instructions)
 
@@ -71,6 +87,7 @@ def render_column(
     column: Column,
     is_selected: bool,
     any_column_spinning: bool,
+    game_state: GameState,
 ) -> list[DrawInstruction]:
     draw_instructions: list[DrawInstruction] = []
 
@@ -80,7 +97,7 @@ def render_column(
         card_index = wrap_cursor(int(column.cursor + row_offset), column.cards)
         rich_text = card_rich_text(column.cards[card_index])
 
-        if is_selected and not any_column_spinning:
+        if is_selected and game_state == GameState.POST_SPIN_COLUMN_PICKING:
             rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.5)
             # Arrows
             draw_instructions.append(
@@ -100,11 +117,12 @@ def render_column(
 
         if not is_cursor_row:
             # Fade away dimming of neighbors
-            alpha_mult = abs(1.0 / row_offset * 0.3)
-            rich_text.bg_color *= alpha_mult
-            rich_text.text_color *= alpha_mult
+            alpha = abs(1.0 / row_offset * 0.3)
+            rich_text.bg_color *= alpha
+            rich_text.text_color *= alpha
 
         if column.spin_time_remaining:
+            alpha = random.uniform(0.85, 1.0)
             rich_text.bg_color *= random.uniform(0.85, 1.0)
             rich_text.text_color = lerp_rgb(
                 rich_text.bg_color,

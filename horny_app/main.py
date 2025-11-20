@@ -1,18 +1,13 @@
-import math
 import random
-from abc import ABC
-from copy import copy
-from dataclasses import dataclass, field
 from enum import Enum, auto
-from functools import partial
-from typing import Callable, cast
 
 from blessed import Terminal
 
-from horny_app.context import Context, GameState
+from horny_app.context import Context
 from horny_app.ezterm import (
     BACKGROUND_COLOR,
     RGB,
+    DrawInstruction,
     FPSCounter,
     PrintAtCallable,
     RichText,
@@ -22,14 +17,14 @@ from horny_app.ezterm import (
     fill_screen_background,
     flush_diffs,
     lerp_rgb,
+    print_at,
+    render_fps_counter,
     update_fps_counter,
 )
-from horny_app.ezterm import print_at as verbose_print_at
-from horny_app.input import Action, Input, ValidatedInputAction, map_input, resolve_input
+from horny_app.game_state import GameState
+from horny_app.input import Action, map_input, resolve_input
 from horny_app.playing_card import (
     FULL_DECK,
-    RANK_STR,
-    SUIT_STR,
     PlayingCard,
     Rank,
     Suit,
@@ -39,9 +34,9 @@ from horny_app.slots import (
     Column,
     Slots,
     calc_spin_speed,
-    render_column,
     render_slots,
-    tick_slots,
+    start_slots_spin,
+    tick_slots_spin,
     wrap_cursor,
 )
 
@@ -170,6 +165,7 @@ def main():
                 Column(0, FULL_DECK.copy()),
             ]
         ),
+        cards_in_hand=[],
         fps_counter=FPSCounter(),
     )
 
@@ -193,18 +189,76 @@ def main():
                 if action == Action.QUIT_GAME:
                     exit()
 
-                if action == Action.SPIN_SLOTS:
-                    print("spinner")
+                elif action == Action.SPIN_SLOTS:
+                    start_slots_spin(ctx)
                     ctx.game_state = GameState.SPINNING_SLOTS
 
-            tick_slots(ctx, dt)
-            _ = render_slots(ctx)
+                elif action == Action.SLOTS_MOVE_SELECTION_LEFT:
+                    ctx.slots.selected_column_index -= 1
+
+                elif action == Action.SLOTS_MOVE_SELECTION_RIGHT:
+                    ctx.slots.selected_column_index += 1
+
+                elif action == Action.SLOTS_PICK_CARD:
+                    selected_column: Column = ctx.slots.columns[ctx.slots.selected_column_index]
+                    selected_card_index: int = wrap_cursor(
+                        int(selected_column.cursor), selected_column.cards
+                    )
+
+                    ctx.cards_in_hand.append(selected_column.cards[selected_card_index])
+                    ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+            # --- Logic tick ---
+            if ctx.game_state == GameState.SPINNING_SLOTS:
+                spin_finished = tick_slots_spin(ctx, dt)
+
+                if spin_finished:
+                    ctx.game_state = GameState.POST_SPIN_COLUMN_PICKING
+
+            update_fps_counter(ctx.fps_counter, dt)
+
+            # --- Rendering ---
+            draw_instructions: list[DrawInstruction] = []
+
+            draw_instructions.extend(render_slots(ctx))
+
+            fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
+            x = ctx.screen.width - len(fps_text) - 1
+            draw_instructions.append(
+                DrawInstruction(
+                    x,
+                    0,
+                    RichText(
+                        fps_text,
+                        lerp_rgb(RGB.GREEN, RGB.WHITE, 0.6),
+                    ),
+                )
+            )
+
+            draw_instructions.append(
+                DrawInstruction(
+                    0,
+                    23,
+                    RichText(
+                        str(ctx.game_state.name),
+                        lerp_rgb(RGB.RED, RGB.WHITE, 0.6),
+                    ),
+                )
+            )
+
+            # temp hand rendering
+            for n, card in enumerate(ctx.cards_in_hand):
+                rich_text = card_rich_text(card)
+                rich_text.bg_color *= 1.0 - 0.1 * n
+                rich_text.text_color *= 1.0 - 0.1 * n
+
+                print_at(term, screen, 40, 5 + n, rich_text)
+
+            for instruction in draw_instructions:
+                print_at(term, screen, instruction.x, instruction.y, instruction.rich_text)
+            flush_diffs(ctx.term, buffer_diff(ctx.screen))
+
+            # Special debug line
+            print_at(term, screen, 35, 23, ctx.debug_text)
 
             dt = fps_limiter()
-
-            # tick_outcome: ProgramStatus = tick(
-            #     ctx,
-            #     delta_time,
-            #     print_at,
-            # )
-            #     break

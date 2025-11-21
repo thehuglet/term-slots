@@ -94,7 +94,7 @@ class Screen:
 class DrawCall:
     x: int
     y: int
-    rich_text: str | RichText | list[str | RichText]
+    text: RichText
 
 
 @dataclass

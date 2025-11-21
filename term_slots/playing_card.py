@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from enum import IntEnum
 
-from term_slots.ezterm import RGB, RichText
+from term_slots.ezterm import RGB, DrawCall, RichText
+
+DEFAULT_CARD_BG_COLOR: RGB = RGB.WHITE
 
 
 class Suit(IntEnum):
@@ -12,15 +14,15 @@ class Suit(IntEnum):
 
 
 class Rank(IntEnum):
-    N_2 = 2
-    N_3 = 3
-    N_4 = 4
-    N_5 = 5
-    N_6 = 6
-    N_7 = 7
-    N_8 = 8
-    N_9 = 9
-    N_10 = 10
+    NUM_2 = 2
+    NUM_3 = 3
+    NUM_4 = 4
+    NUM_5 = 5
+    NUM_6 = 6
+    NUM_7 = 7
+    NUM_8 = 8
+    NUM_9 = 9
+    NUM_10 = 10
     JACK = 11
     QUEEN = 12
     KING = 13
@@ -48,15 +50,15 @@ SUIT_STR: dict[Suit, str] = {
 }
 
 RANK_STR: dict[Rank, str] = {
-    Rank.N_2: "2",
-    Rank.N_3: "3",
-    Rank.N_4: "4",
-    Rank.N_5: "5",
-    Rank.N_6: "6",
-    Rank.N_7: "7",
-    Rank.N_8: "8",
-    Rank.N_9: "9",
-    Rank.N_10: "10",
+    Rank.NUM_2: "2",
+    Rank.NUM_3: "3",
+    Rank.NUM_4: "4",
+    Rank.NUM_5: "5",
+    Rank.NUM_6: "6",
+    Rank.NUM_7: "7",
+    Rank.NUM_8: "8",
+    Rank.NUM_9: "9",
+    Rank.NUM_10: "10",
     Rank.JACK: "J",
     Rank.QUEEN: "Q",
     Rank.KING: "K",
@@ -94,7 +96,7 @@ def card_rich_text_big(card: PlayingCard) -> list[RichText]:
             " S ",
             " >>",
         ]
-    elif card.rank == Rank.N_2:
+    elif card.rank == Rank.NUM_2:
         pattern = [
             "<<S",
             "   ",
@@ -119,3 +121,14 @@ def card_rich_text_big(card: PlayingCard) -> list[RichText]:
         output.append(RichText(text_row, suit_color, bg_color, bold=True))
 
     return output
+
+
+def render_card_small(x: int, y: int, card: PlayingCard) -> DrawCall:
+    suit_str: str = SUIT_STR[card.suit]
+    suit_color: RGB = SUIT_COLOR[card.suit]
+    rank_str: str = RANK_STR[card.rank]
+
+    # Pad rank with rjust(2) so "10" aligns correctly, making card width 3 chars
+    text: str = suit_str + rank_str.rjust(2)
+
+    return DrawCall(x, y, RichText(text, suit_color, DEFAULT_CARD_BG_COLOR, bold=True))

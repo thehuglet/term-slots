@@ -21,39 +21,45 @@ from term_slots.ezterm import (
 )
 from term_slots.game_state import GameState
 from term_slots.hand import Hand
-from term_slots.input import Action, get_action, map_input, resolve_action
+from term_slots.input import get_action, map_input, resolve_action
 from term_slots.playing_card import (
     FULL_DECK,
-    PlayingCard,
-    Rank,
-    Suit,
     card_rich_text_big,
 )
 from term_slots.slots import (
     Column,
     Slots,
     render_slots,
-    tick_slots_spin,
-    wrap_cursor,
+    spin_slots_and_check_finished,
 )
 
 
 def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config):
-    draw_calls: list[DrawCall] = []
-
+    # --- Inputs ---
     if input := map_input(term.inkey(timeout=0.0)):
         if action := get_action(ctx, input):
             resolve_action(ctx, action, config)
 
     # --- Game logic ---
+    if ctx.game_state == GameState.SPINNING_SLOTS:
+        spin_finished = spin_slots_and_check_finished(ctx, dt, config.slots_max_spin_speed)
+
+        if spin_finished:
+            ctx.game_state = GameState.SLOTS_POST_SPIN_COLUMN_PICKING
+
+    update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
     # --- Rendering ---
+    draw_calls: list[DrawCall] = []
 
-    # Debugging line
-    draw_calls.append(DrawCall(35, 0, ctx.debug_text))
+    draw_calls.extend(render_slots(5, 6, ctx))
+
+    # draw_calls.extend()
+
+    # draw_calls.append(DrawCall(35, 0, ctx.debug_text))
 
     for draw_call in draw_calls:
-        print_at(term, screen, draw_call.x, draw_call.y, draw_call.rich_text)
+        print_at(term, screen, draw_call.x, draw_call.y, draw_call.text)
     flush_diffs(ctx.term, buffer_diff(ctx.screen))
 
 
@@ -97,21 +103,21 @@ def main():
 
         while True:
             tick(dt, ctx, term, screen, config)
-            dt *= config.game_speed
+            # dt *= config.game_speed
 
             # --- Logic tick ---
             if ctx.game_state == GameState.SPINNING_SLOTS:
-                spin_finished = tick_slots_spin(ctx, dt, config.slots_max_spin_speed)
+                spin_finished = spin_slots_and_check_finished(ctx, dt, config.slots_max_spin_speed)
 
                 if spin_finished:
                     ctx.game_state = GameState.SLOTS_POST_SPIN_COLUMN_PICKING
 
-            update_fps_counter(ctx.fps_counter, dt / config.game_speed)
+            # update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
             # --- Rendering ---
             draw_instructions: list[DrawCall] = []
 
-            draw_instructions.extend(render_slots(ctx, 5, 6))
+            # draw_instructions.extend(render_slots_old(ctx, 5, 6))
 
             fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
             x = ctx.screen.width - len(fps_text) - 1
@@ -211,9 +217,9 @@ def main():
                         )
 
             card_count = len(ctx.hand.cards)
-            draw_instructions.append(
-                DrawCall(x + 35, y + 4, f"{card_count}/{max_card_count}".rjust(5))
-            )
+            # draw_instructions.append(
+            #     DrawCall(x + 35, y + 4, f"{card_count}/{max_card_count}".rjust(5))
+            # )
 
             # for instruction in draw_instructions:
             #     print_at(term, screen, instruction.x, instruction.y, instruction.rich_text)

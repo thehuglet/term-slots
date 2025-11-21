@@ -5,7 +5,7 @@ from blessed.keyboard import Keystroke
 from term_slots import config
 from term_slots.context import Context
 from term_slots.game_state import GameState
-from term_slots.slots import Column, calc_column_spin_duration_sec, start_slots_spin, wrap_cursor
+from term_slots.slots import Column, calc_column_spin_duration_sec
 
 
 class Input(Enum):
@@ -114,18 +114,10 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
             exit()
 
         case Action.SPIN_SLOTS:
-            for col_index, col in enumerate(ctx.slots.columns):
-                # start_slots_spin(
-                #     ctx,
-                #     config.slots_spin_duration_sec,
-                #     config.slots_spin_duration_stagger_sec_min,
-                #     config.slots_spin_duration_stagger_ratio,
-                #     config.slots_spin_duration_stagger_diminishing_ratio,
-                # )
+            for col_index, selected_col in enumerate(ctx.slots.columns):
                 spin_duration = calc_column_spin_duration_sec(col_index, config)
-
-                col.spin_duration = spin_duration
-                col.spin_time_remaining = spin_duration
+                selected_col.spin_duration = spin_duration
+                selected_col.spin_time_remaining = spin_duration
 
             ctx.game_state = GameState.SPINNING_SLOTS
 
@@ -136,12 +128,10 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
             ctx.slots.selected_column_index += 1
 
         case Action.SLOTS_PICK_CARD:
-            selected_column: Column = ctx.slots.columns[ctx.slots.selected_column_index]
-            selected_card_index: int = wrap_cursor(
-                int(selected_column.cursor), selected_column.cards
-            )
+            selected_col: Column = ctx.slots.columns[ctx.slots.selected_column_index]
+            selected_card_index: int = int(selected_col.cursor) % len(selected_col.cards)
 
-            ctx.hand.cards.append(selected_column.cards[selected_card_index])
+            ctx.hand.cards.append(selected_col.cards[selected_card_index])
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
         case Action.FOCUS_SLOTS:

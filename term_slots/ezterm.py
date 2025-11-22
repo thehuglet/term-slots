@@ -76,7 +76,6 @@ class ScreenBuffer:
     width: int
     height: int
     chars: np.ndarray  # shape (height, width), dtype='<U1'
-    # styles: np.ndarray  # shape (height, width), dtype=object
     styles: (
         np.ndarray
     )  # shape (height, width), dtype=object, each element: (fg: RGB, bg: RGB, bold: bool)
@@ -138,12 +137,6 @@ def lerp_rgb(a: RGB, b: RGB, t: float) -> RGB:
     )
 
 
-# def create_buffer(width: int, height: int) -> ScreenBuffer:
-#     chars = np.full((height, width), " ", dtype="<U1")
-#     styles = np.full((height, width), "", dtype=object)
-#     return ScreenBuffer(width, height, chars, styles)
-
-
 def create_buffer(width: int, height: int) -> ScreenBuffer:
     chars = np.full((height, width), " ", dtype="<U1")
     # store default style: white text on background color, not bold
@@ -183,14 +176,6 @@ def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> Non
 
     sys.stdout.write("".join(output))
     sys.stdout.flush()
-
-
-# def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> None:
-#     output = [
-#         term.move_xy(int(x), int(y)) + style + char + term.normal for y, x, (char, style) in diffs
-#     ]
-#     sys.stdout.write("".join(output))
-#     sys.stdout.flush()
 
 
 def create_fps_limiter(
@@ -247,25 +232,6 @@ def update_fps_counter(fps_counter: FPSCounter, dt: float) -> None:
         fps_counter.ema = inst
     else:
         fps_counter.ema = fps_counter.ema * (1.0 - fps_counter.alpha) + inst * fps_counter.alpha
-
-
-# def _make_style(term: Terminal, fg: RGB, bg: RGB | None, bold: bool) -> str:
-#     """
-#     Build a blessed style string from RGB fg/bg and bold flag.
-#     If bg is None, fall back to BACKGROUND_COLOR.
-#     """
-#     if not term.does_styling:
-#         return term.normal
-
-#     fg_rgb = _rgb_to_rgb_int(fg)
-#     bg_use = bg if bg is not None else BACKGROUND_COLOR
-#     bg_rgb = _rgb_to_rgb_int(bg_use)
-
-#     fg_str = term.color_rgb(*fg_rgb)
-#     bg_str = term.on_color_rgb(*bg_rgb)
-#     bold_str = term.bold if bold else ""
-
-#     return f"{term.normal}{bold_str}{fg_str}{bg_str}"
 
 
 def _make_style(term: Terminal, fg: RGB, bg: RGB, bold: bool) -> str:
@@ -332,13 +298,6 @@ def fill_screen_background(new_buffer: ScreenBuffer, color: RGB) -> None:
     for y in range(new_buffer.height):
         for x in range(new_buffer.width):
             new_buffer.styles[y, x] = style_tuple
-
-
-# def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:
-#     bg_style = term.on_color_rgb(*_rgb_to_rgb_int(color))
-
-#     screen.new_buffer.chars[:, :] = " "
-#     screen.new_buffer.styles[:, :] = bg_style
 
 
 def render_fps_counter(x: int, y: int, fps_counter: FPSCounter) -> list[DrawCall]:

@@ -6,3 +6,5 @@ class GameState(Enum):
     SPINNING_SLOTS = auto()
     SLOTS_POST_SPIN_COLUMN_PICKING = auto()
     SELECTING_HAND_CARDS = auto()
+    BURN_MODE = auto()
+    FORCED_BURN_MODE = auto()

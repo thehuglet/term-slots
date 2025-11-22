@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 
 from term_slots.config import Config
 from term_slots.context import Context
-from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb
+from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb, mul_alpha
 from term_slots.game_state import GameState
-from term_slots.playing_card import PlayingCard, card_rich_text, render_card_small
+from term_slots.playing_card import PlayingCard, render_card_small
 
 SLOT_COLUMN_NEIGHBOR_COUNT = 3
 
@@ -25,47 +25,30 @@ class Column:
     cards: list[PlayingCard] = field(default_factory=list)
     spin_duration: float = 0.0
     spin_time_remaining: float = 0.0
-    # finish_flash_timer: float = 0.0
     spin_speed: float = 0.0
-    spin_speed
 
 
-# def start_slots_spin(
-#     ctx: Context,
-#     duration_sec: float,
-#     duration_stagger_sec_min: float,
-#     duration_stagger_ratio: float,
-#     duration_stagger_diminishing_ratio: float,
-# ):
-#     base_increment = duration_sec * duration_stagger_ratio
-#     r = duration_stagger_diminishing_ratio
+def calc_column_spin_duration_sec(col_index: int, cfg: Config) -> float:
+    duration: float = cfg.slots_spin_duration_sec
+    stagger_ratio: float = cfg.slots_spin_duration_stagger_ratio
+    min_stagger_duration: float = cfg.slots_spin_duration_stagger_sec_min
+    geometric_weight: float = cfg.slots_spin_geometric_weight
 
-#     for n, column in enumerate(ctx.slots.columns):
-#         if n == 0:
-#             stagger = 0
-#         else:
-#             # total extra time = sum of all previous per-column increments, clamped to min
-#             stagger = sum(max(base_increment * (r**i), duration_stagger_sec_min) for i in range(n))
-
-#         total_duration = duration_sec + stagger
-#         column.spin_duration = total_duration
-#         column.spin_time_remaining = total_duration
-
-
-def calc_column_spin_duration_sec(col_index: int, config: Config) -> float:
-    duration: float = config.slots_spin_duration_sec
-    stagger_ratio: float = config.slots_spin_duration_stagger_ratio
-    min_stagger_time: float = config.slots_spin_duration_stagger_sec_min
-
-    base_increment: float = duration * stagger_ratio
+    base: float = duration * stagger_ratio
 
     if col_index == 0:
-        stagger = 0
-    else:
-        # total extra time = sum of all previous per-column increments, clamped to min
-        stagger = sum(
-            max(base_increment * (stagger_ratio**i), min_stagger_time) for i in range(col_index)
-        )
+        return duration
+
+    geometric_increments: list[float] = [
+        max(base * (stagger_ratio**i), min_stagger_duration) for i in range(col_index)
+    ]
+
+    linear_increments: list[float] = [max(base, min_stagger_duration) for _ in range(col_index)]
+
+    stagger: float = sum(
+        linear_increments[i] * (1.0 - geometric_weight) + geometric_increments[i] * geometric_weight
+        for i in range(col_index)
+    )
 
     return duration + stagger
 
@@ -105,34 +88,20 @@ def spin_slots_and_check_finished(ctx: Context, dt: float, max_spin_speed: float
     return False
 
 
-# def render_slots_old(ctx: Context, x: int, y: int) -> list[DrawCall]:
-#     draw_instructions: list[DrawCall] = []
-
-#     spacing = 5
-#     # y = 6
-#     any_column_spinning: bool = ctx.game_state == GameState.SPINNING_SLOTS
-
-#     for n, column in enumerate(ctx.slots.columns):
-#         is_selected: bool = ctx.slots.selected_column_index == n
-
-#         col_x = x + n * spacing
-#         instructions: list[DrawCall] = render_column_old(
-#             col_x, y, column, is_selected, any_column_spinning, ctx.game_state
-#         )  # pyright: ignore
-#         draw_instructions.extend(instructions)
-
-#     return draw_instructions
-
-
-def render_slots(x: int, y: int, ctx: Context) -> list[DrawCall]:
+def render_slots(x: int, y: int, ctx: Context, game_time: float) -> list[DrawCall]:
     draw_calls: list[DrawCall] = []
+    all_focussed_game_states: list[GameState] = [
+        GameState.READY_TO_SPIN_SLOTS,
+        GameState.SPINNING_SLOTS,
+        GameState.SLOTS_POST_SPIN_COLUMN_PICKING,
+    ]
 
     x_spacing = 5
-    slots_focussed: bool = # TODO: finish this
-    # any_col_is_spinning: bool = ctx.game_state == GameState.SPINNING_SLOTS
+    slots_are_focused: bool = ctx.game_state in all_focussed_game_states
 
     for col_index, col in enumerate(ctx.slots.columns):
-        # is_selected: bool = ctx.slots.selected_column_index == col_index
+        is_game_state_picking: bool = ctx.game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING
+        col_is_selected: bool = ctx.slots.selected_column_index == col_index
 
         col_x: int = x + col_index * x_spacing
         col_y: int = y
@@ -141,15 +110,50 @@ def render_slots(x: int, y: int, ctx: Context) -> list[DrawCall]:
                 col_x,
                 col_y,
                 col,  # pyright: ignore
-                is_focussed=True,
+                game_time,
+                slots_are_focused,
+                column_is_selected=is_game_state_picking and col_is_selected,
             )
         )
+
+        # Center center row indicators
+        is_first_column: bool = col_index == 0
+        is_last_column: bool = col_index == len(ctx.slots.columns) - 1
+
+        column_indicator_color: RGB = lerp_rgb(RGB.GOLD, RGB.WHITE, 0.5) * 0.4
+        row_indicator_color: RGB = lerp_rgb(RGB.GOLD, RGB.WHITE, 0.5)
+
+        # Dim row indicator arrows when not focussed
+        if not slots_are_focused:
+            row_indicator_color *= 0.2
+
+        if is_first_column:
+            draw_calls.append(DrawCall(col_x - 2, col_y, RichText("▸", row_indicator_color)))
+        if is_last_column:
+            draw_calls.append(DrawCall(col_x + 4, col_y, RichText("◂", row_indicator_color)))
+
+        # Column selection arrows
+        if is_game_state_picking and col_is_selected:
+            arrow_x: int = col_x + 1
+            top_arrow_y: int = col_y + SLOT_COLUMN_NEIGHBOR_COUNT + 1
+            bot_arrow_y: int = col_y - SLOT_COLUMN_NEIGHBOR_COUNT - 1
+
+            # Column indicator arrows
+            draw_calls.append(DrawCall(arrow_x, top_arrow_y, RichText("▴", column_indicator_color)))
+            draw_calls.append(DrawCall(arrow_x, bot_arrow_y, RichText("▾", column_indicator_color)))
 
     return draw_calls
 
 
-def render_column(x: int, y: int, column: Column, is_focussed: bool) -> list[DrawCall]:
-    def card_index(row_offset: int, column: Column) -> int:
+def render_column(
+    x: int,
+    y: int,
+    column: Column,
+    game_time: float,
+    slots_are_focused: bool,
+    column_is_selected: bool,
+) -> list[DrawCall]:
+    def get_card_index(row_offset: int, column: Column) -> int:
         """Retrieves the wrapped card index from the column."""
         index: int = int(column.cursor + row_offset)
         wrapped_index: int = index % len(column.cards)
@@ -161,100 +165,59 @@ def render_column(x: int, y: int, column: Column, is_focussed: bool) -> list[Dra
         -SLOT_COLUMN_NEIGHBOR_COUNT,
         SLOT_COLUMN_NEIGHBOR_COUNT + 1,
     ):
+        is_center_row: bool = row_offset == 0
+
         card_x: int = x
         card_y: int = y + row_offset
-        card: PlayingCard = column.cards[card_index(row_offset, column)]
+        card_index: int = get_card_index(row_offset, column)
+        card: PlayingCard = column.cards[card_index]
 
         card_draw_call: DrawCall = render_card_small(card_x, card_y, card)
+        rt: RichText = card_draw_call.rich_text
+
+        # Base card background alpha
+        if rt.bg_color:
+            rt.bg_color *= 0.8
+
+        # Column center row highlight during picking phase
+        if column_is_selected and rt.bg_color:
+            # Column Highlight
+            rt.bg_color = lerp_rgb(rt.bg_color, RGB.GOLD, 0.3)
+
+            # Sinewave center row highlight
+            if is_center_row:
+                amplitude: float = 1.0
+                frequency: float = 6.5
+                t: float = 0.5 + 0.5 * amplitude * math.sin(frequency * game_time)
+
+                rt.bg_color = lerp_rgb(rt.bg_color, RGB.WHITE, t)
+                rt.text_color = lerp_rgb(rt.text_color, RGB.WHITE, t * 0.8)
+
+        # Multiplying by random alpha while spinning
+        col_is_spinning: bool = column.spin_time_remaining > 0.0
+        if col_is_spinning and rt.bg_color:
+            seeded_random = random.Random(card_index)
+            rt.bg_color *= seeded_random.uniform(0.85, 1.0)
+            rt.text_color = lerp_rgb(
+                rt.bg_color,
+                rt.text_color,
+                seeded_random.uniform(0.0, 1.0),
+            )
 
         # Alpha dimming of neighbors using a gaussian curve
-        sigma: float = 1.5
+        sigma: float = 1.3
         alpha: float = math.exp(-(row_offset**2) / (2 * sigma**2))
 
-        if card_draw_call.text.bg_color:
-            card_draw_call.text.bg_color *= alpha
-        card_draw_call.text.text_color *= alpha
+        if not slots_are_focused:
+            # This trick lowers the brightness and contrast when unfocussed
+            alpha = alpha * 0.1 + 0.05
 
-        # Unfocussed dimming
-        if not is_focussed:
-            draw_calls
+        rt = mul_alpha(rt, alpha)
 
+        card_draw_call.rich_text = rt
         draw_calls.append(card_draw_call)
-        # is_main_row: bool = row_offset == 0
 
     return draw_calls
-
-
-# def render_column_old(
-#     x: int,
-#     y: int,
-#     column: Column,
-#     is_selected: bool,
-#     any_column_spinning: bool,
-#     game_state: GameState,
-# ) -> list[DrawCall]:
-#     draw_instructions: list[DrawCall] = []
-
-#     for row_offset in range(-SLOT_COLUMN_NEIGHBOR_COUNT, SLOT_COLUMN_NEIGHBOR_COUNT + 1):
-#         is_cursor_row = row_offset == 0
-
-#         card_index = wrap_cursor(int(column.cursor + row_offset), column.cards)
-#         rich_text = card_rich_text(column.cards[card_index])
-
-#         if is_selected and game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING:
-#             rich_text.bg_color = lerp_rgb(rich_text.bg_color, RGB.GOLD, 0.5)
-#             # Arrows
-#             draw_instructions.append(
-#                 DrawCall(
-#                     x,
-#                     y + SLOT_COLUMN_NEIGHBOR_COUNT + 1,
-#                     RichText(" ▴ ", RGB.GOLD * 0.4),
-#                 )
-#             )
-#             draw_instructions.append(
-#                 DrawCall(
-#                     x,
-#                     y - SLOT_COLUMN_NEIGHBOR_COUNT - 1,
-#                     RichText(" ▾ ", RGB.GOLD * 0.4),
-#                 )
-#             )
-
-#         if is_cursor_row:
-#             alpha = 0.9
-#             rich_text.bg_color *= alpha
-#             rich_text.text_color *= alpha
-#         else:
-#             # Fade away dimming of neighbors
-#             alpha = abs(1.0 / row_offset * 0.3)
-#             rich_text.bg_color *= alpha
-#             rich_text.text_color *= alpha
-
-#         # draw_instructions.append(DrawInstruction(x, 2, f"{column.spin_duration:2.1f}"))
-
-#         if column.spin_time_remaining:
-#             seeded_random = random.Random(card_index)
-#             # alpha = seeded_random.uniform(0.85, 1.0)
-#             rich_text.bg_color *= seeded_random.uniform(0.85, 1.0)
-#             rich_text.text_color = lerp_rgb(
-#                 rich_text.bg_color,
-#                 rich_text.text_color,
-#                 seeded_random.uniform(0.0, 1.0),
-#             )
-
-#         slots_focussed_game_states: list[GameState] = [
-#             GameState.READY_TO_SPIN_SLOTS,
-#             GameState.SPINNING_SLOTS,
-#             GameState.SLOTS_POST_SPIN_COLUMN_PICKING,
-#         ]
-#         if game_state not in slots_focussed_game_states:
-#             unfocussed_alpha_modifier = 0.5 * (abs(row_offset) + 1) * 0.4
-#             # unfocussed_alpha_modifier = 0.3
-#             rich_text.bg_color *= unfocussed_alpha_modifier
-#             rich_text.text_color *= unfocussed_alpha_modifier
-
-#         draw_instructions.append(DrawCall(x, y + row_offset, rich_text))
-
-#     return draw_instructions
 
 
 def calc_spin_speed(

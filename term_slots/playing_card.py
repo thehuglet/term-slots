@@ -4,6 +4,7 @@ from enum import IntEnum
 from term_slots.ezterm import RGB, DrawCall, RichText
 
 DEFAULT_CARD_BG_COLOR: RGB = RGB.WHITE
+PLAYING_CARD_WIDTH: int = 3
 
 
 class Suit(IntEnum):
@@ -83,11 +84,24 @@ def card_rich_text(card: PlayingCard) -> RichText:
     )
 
 
-def card_rich_text_big(card: PlayingCard) -> list[RichText]:
-    suit_str = SUIT_STR[card.suit]
-    suit_color = SUIT_COLOR[card.suit]
-    rank_str = RANK_STR[card.rank]
-    bg_color = RGB.WHITE * 0.9
+def render_card_small(x: int, y: int, card: PlayingCard) -> DrawCall:
+    suit_str: str = SUIT_STR[card.suit]
+    suit_color: RGB = SUIT_COLOR[card.suit]
+    rank_str: str = RANK_STR[card.rank]
+
+    # Pad rank with rjust(2) so "10" aligns correctly, making card width 3 chars
+    text: str = suit_str + rank_str.rjust(2)
+
+    return DrawCall(x, y, RichText(text, suit_color, DEFAULT_CARD_BG_COLOR, bold=True))
+
+
+def render_card_big(x, y, card: PlayingCard) -> list[DrawCall]:
+    draw_calls: list[DrawCall] = []
+
+    suit_str: str = SUIT_STR[card.suit]
+    rank_str: str = RANK_STR[card.rank]
+    suit_color: RGB = SUIT_COLOR[card.suit]
+    bg_color: RGB = DEFAULT_CARD_BG_COLOR
 
     # Choose pattern based on rank
     if card.rank == Rank.ACE:
@@ -109,26 +123,14 @@ def card_rich_text_big(card: PlayingCard) -> list[RichText]:
             "S>>",
         ]
 
-    output: list[RichText] = []
-
-    for pattern_row in pattern:
+    for row_index, pattern_row in enumerate(pattern):
         text_row = pattern_row
 
         text_row = text_row.replace("<<", rank_str.ljust(2))
         text_row = text_row.replace(">>", rank_str.rjust(2))
         text_row = text_row.replace("S", suit_str)
 
-        output.append(RichText(text_row, suit_color, bg_color, bold=True))
+        rich_text = RichText(text_row, suit_color, bg_color, bold=True)
+        draw_calls.append(DrawCall(x, y + row_index, rich_text))
 
-    return output
-
-
-def render_card_small(x: int, y: int, card: PlayingCard) -> DrawCall:
-    suit_str: str = SUIT_STR[card.suit]
-    suit_color: RGB = SUIT_COLOR[card.suit]
-    rank_str: str = RANK_STR[card.rank]
-
-    # Pad rank with rjust(2) so "10" aligns correctly, making card width 3 chars
-    text: str = suit_str + rank_str.rjust(2)
-
-    return DrawCall(x, y, RichText(text, suit_color, DEFAULT_CARD_BG_COLOR, bold=True))
+    return draw_calls

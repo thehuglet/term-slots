@@ -1,21 +1,20 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from blessed import Terminal
-
 if TYPE_CHECKING:
-    from term_slots.ezterm import FPSCounter, RichText, Screen
+    from term_slots.ezterm import FPSCounter, RichText
     from term_slots.game_state import GameState
     from term_slots.hand import Hand
+    from term_slots.playing_card import PlayingCard
     from term_slots.slots import Slots
 
 
 @dataclass
 class Context:
-    term: Terminal
-    screen: Screen
+    game_time: float
+    game_state: GameState
     slots: Slots
     hand: Hand
-    game_state: GameState
+    forced_burn_replacement_card: PlayingCard
     fps_counter: FPSCounter
     debug_text: str | RichText = ""

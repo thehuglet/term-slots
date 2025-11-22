@@ -22,8 +22,10 @@ class RGB:
 
     WHITE: ClassVar[RGB]
     BLACK: ClassVar[RGB]
+    CRIMSON_RED: ClassVar[RGB]
     RED: ClassVar[RGB]
     GREEN: ClassVar[RGB]
+    LIME: ClassVar[RGB]
     BLUE: ClassVar[RGB]
     ORANGE: ClassVar[RGB]
     LIGHT_BLUE: ClassVar[RGB]
@@ -49,7 +51,9 @@ class RGB:
 RGB.WHITE = RGB(1.0, 1.0, 1.0)
 RGB.BLACK = RGB(0.0, 0.0, 0.0)
 RGB.RED = RGB(1.0, 0.0, 0.0)
+RGB.CRIMSON_RED = RGB(0.86, 0.08, 0.24)
 RGB.GREEN = RGB(0.0, 1.0, 0.0)
+RGB.LIME = RGB(0.56, 0.93, 0.56)
 RGB.BLUE = RGB(0.0, 0.0, 1.0)
 RGB.ORANGE = RGB(1.0, 0.5, 0.0)
 RGB.LIGHT_BLUE = RGB(0.65, 0.85, 0.9)
@@ -94,13 +98,25 @@ class Screen:
 class DrawCall:
     x: int
     y: int
-    text: RichText
+    rich_text: RichText
 
 
 @dataclass
 class FPSCounter:
     ema: float = 0.0
     alpha: float = 0.08
+
+
+def mul_alpha(rich_text: RichText, value: float) -> RichText:
+    """Multiplies the alpha of `text_color` and `bg_color` if applicable."""
+
+    new_text_color: RGB = rich_text.text_color * value
+    new_bg_color: RGB | None = rich_text.bg_color
+
+    if new_bg_color:
+        new_bg_color *= value
+
+    return RichText(rich_text.text, new_text_color, new_bg_color, rich_text.bold)
 
 
 def lerp_rgb(a: RGB, b: RGB, t: float) -> RGB:
@@ -310,12 +326,12 @@ def print_at(
         px += len(chars)
 
 
-def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:
-    screen.new_buffer.chars[:, :] = " "
-    # set style tuples (fg, bg, bold) for every cell
-    for y in range(screen.new_buffer.height):
-        for x in range(screen.new_buffer.width):
-            screen.new_buffer.styles[y, x] = (RGB.WHITE, color, False)
+def fill_screen_background(new_buffer: ScreenBuffer, color: RGB) -> None:
+    new_buffer.chars[:, :] = " "
+    style_tuple = (RGB.WHITE, color, False)
+    for y in range(new_buffer.height):
+        for x in range(new_buffer.width):
+            new_buffer.styles[y, x] = style_tuple
 
 
 # def fill_screen_background(term: Terminal, screen: Screen, color: RGB) -> None:

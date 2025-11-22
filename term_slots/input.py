@@ -5,6 +5,7 @@ from blessed.keyboard import Keystroke
 from term_slots import config
 from term_slots.context import Context
 from term_slots.game_state import GameState
+from term_slots.playing_card import PlayingCard
 from term_slots.slots import Column, calc_column_spin_duration_sec
 
 
@@ -16,6 +17,7 @@ class Input(Enum):
     DOWN = auto()
     CONFIRM = auto()
     SWAP = auto()
+    TOGGLE_BURN_MODE = auto()
 
 
 class Action(Enum):
@@ -30,20 +32,21 @@ class Action(Enum):
     HAND_MOVE_SELECTION_RIGHT = auto()
     HAND_SELECT_CARD = auto()
     HAND_DESELECT_CARD = auto()
+    ENTER_BURN_MODE = auto()
+    EXIT_BURN_MODE = auto()
+    BURN_CARD = auto()
+    BURN_CARD_FORCED = auto()
 
 
 KEYMAP: dict[str, Input] = {
-    "q": Input.QUIT,
-    "w": Input.UP,
-    "a": Input.LEFT,
-    "s": Input.DOWN,
-    "d": Input.RIGHT,
     "KEY_UP": Input.UP,
     "KEY_LEFT": Input.LEFT,
     "KEY_DOWN": Input.DOWN,
     "KEY_RIGHT": Input.RIGHT,
     "KEY_ENTER": Input.CONFIRM,
     "KEY_TAB": Input.SWAP,
+    "b": Input.TOGGLE_BURN_MODE,
+    "q": Input.QUIT,
 }
 
 
@@ -77,31 +80,48 @@ def get_action(ctx: Context, input: Input) -> Action | None:
         if input == Input.CONFIRM:
             return Action.SLOTS_PICK_CARD
 
-        elif input == Input.LEFT and not first_column_is_selected:
+        if input == Input.LEFT and not first_column_is_selected:
             return Action.SLOTS_MOVE_SELECTION_LEFT
 
-        elif input == Input.RIGHT and not last_column_is_selected:
+        if input == Input.RIGHT and not last_column_is_selected:
             return Action.SLOTS_MOVE_SELECTION_RIGHT
 
-    if ctx.game_state == GameState.SELECTING_HAND_CARDS:
+    elif ctx.game_state in (
+        GameState.SELECTING_HAND_CARDS,
+        GameState.BURN_MODE,
+        GameState.FORCED_BURN_MODE,
+    ):
         cursor_is_on_first_card: bool = ctx.hand.cursor_pos == 0
         cursor_is_on_last_card: bool = ctx.hand.cursor_pos == len(ctx.hand.cards) - 1
         card_at_cursor_is_selected: bool = ctx.hand.cursor_pos in ctx.hand.selected_card_indexes
 
-        if input == Input.SWAP:
+        if input == Input.SWAP and ctx.game_state != GameState.FORCED_BURN_MODE:
             return Action.FOCUS_SLOTS
 
         if input == Input.LEFT and not cursor_is_on_first_card:
             return Action.HAND_MOVE_SELECTION_LEFT
 
-        elif input == Input.RIGHT and not cursor_is_on_last_card:
+        if input == Input.RIGHT and not cursor_is_on_last_card:
             return Action.HAND_MOVE_SELECTION_RIGHT
 
-        elif input == Input.UP and not card_at_cursor_is_selected:
-            return Action.HAND_SELECT_CARD
+        if input == Input.TOGGLE_BURN_MODE and ctx.game_state == GameState.BURN_MODE:
+            return Action.EXIT_BURN_MODE
 
-        elif input == Input.DOWN and card_at_cursor_is_selected:
-            return Action.HAND_DESELECT_CARD
+        if input == Input.CONFIRM:
+            if ctx.game_state == GameState.BURN_MODE:
+                return Action.BURN_CARD
+            if ctx.game_state == GameState.FORCED_BURN_MODE:
+                return Action.BURN_CARD_FORCED
+
+        if ctx.game_state == GameState.SELECTING_HAND_CARDS:
+            if input == Input.TOGGLE_BURN_MODE and ctx.hand.cards:
+                return Action.ENTER_BURN_MODE
+
+            if input == Input.UP and not card_at_cursor_is_selected:
+                return Action.HAND_SELECT_CARD
+
+            if input == Input.DOWN and card_at_cursor_is_selected:
+                return Action.HAND_DESELECT_CARD
 
     return None
 
@@ -128,13 +148,23 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
             ctx.slots.selected_column_index += 1
 
         case Action.SLOTS_PICK_CARD:
+            empty_card_slot_available: bool = len(ctx.hand.cards) < ctx.hand.hand_size
+
             selected_col: Column = ctx.slots.columns[ctx.slots.selected_column_index]
             selected_card_index: int = int(selected_col.cursor) % len(selected_col.cards)
+            selected_card: PlayingCard = selected_col.cards[selected_card_index]
 
-            ctx.hand.cards.append(selected_col.cards[selected_card_index])
-            ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+            if empty_card_slot_available:
+                # Add card to hand
+                ctx.hand.cards.append(selected_card)
+                ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+            else:
+                # Cant add card, force burning
+                ctx.forced_burn_replacement_card = selected_card
+                ctx.game_state = GameState.FORCED_BURN_MODE
 
         case Action.FOCUS_SLOTS:
+            ctx.hand.selected_card_indexes = set()
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
         case Action.FOCUS_HAND:
@@ -151,3 +181,28 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
 
         case Action.HAND_DESELECT_CARD:
             ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
+
+        case Action.ENTER_BURN_MODE:
+            ctx.game_state = GameState.BURN_MODE
+
+        case Action.EXIT_BURN_MODE:
+            ctx.game_state = GameState.SELECTING_HAND_CARDS
+
+        case Action.BURN_CARD_FORCED:
+            index_to_replace: int = ctx.hand.cursor_pos
+            ctx.hand.cards[index_to_replace] = ctx.forced_burn_replacement_card
+            ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+        case Action.BURN_CARD:
+            index_to_burn: int = ctx.hand.cursor_pos
+            ctx.hand.selected_card_indexes = set()
+            _ = ctx.hand.cards.pop(index_to_burn)
+
+            new_card_count: int = len(ctx.hand.cards)
+
+            if new_card_count == 0:
+                ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+            else:
+                # Clamp cursor to not exceed the max card index
+                ctx.hand.cursor_pos = min(new_card_count - 1, ctx.hand.cursor_pos)
+                ctx.game_state = GameState.SELECTING_HAND_CARDS

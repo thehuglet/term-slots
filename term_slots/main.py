@@ -30,6 +30,7 @@ from term_slots.playing_card import (
     Rank,
     Suit,
 )
+from term_slots.poker_hand import POKER_HAND_NAMES
 from term_slots.slots import (
     Column,
     Slots,
@@ -61,6 +62,16 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
 
     # Slots rendering
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
+
+    # Current hand display rendering
+    if poker_hand := ctx.hand.current_poker_hand:
+        draw_calls.append(
+            DrawCall(
+                5,
+                23,
+                RichText(POKER_HAND_NAMES[poker_hand]),
+            )
+        )
 
     # Hand rendering
     hand_is_focused: bool = ctx.game_state in (
@@ -124,10 +135,10 @@ def main() -> Never:
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
-                Column(0, FULL_DECK.copy()),
+                # Column(0, FULL_DECK.copy()),
+                # Column(0, FULL_DECK.copy()),
+                # Column(0, FULL_DECK.copy()),
+                # Column(0, FULL_DECK.copy()),
                 # Column(0, FULL_DECK.copy()),
                 # Column(0, FULL_DECK.copy()),
                 # Column(0, FULL_DECK.copy()),
@@ -135,9 +146,17 @@ def main() -> Never:
         ),
         hand=Hand(
             hand_size=10,
-            cards=[],
+            cards=[
+                PlayingCard(Suit.HEART, Rank.ACE),
+                PlayingCard(Suit.SPADE, Rank.ACE),
+                PlayingCard(Suit.SPADE, Rank.ACE),
+                PlayingCard(Suit.SPADE, Rank.ACE),
+                PlayingCard(Suit.SPADE, Rank.ACE),
+                PlayingCard(Suit.SPADE, Rank.ACE),
+            ],
             cursor_pos=0,
             selected_card_indexes=set(),
+            current_poker_hand=None,
         ),
         forced_burn_replacement_card=PlayingCard(Suit.SPADE, Rank.ACE),
         fps_counter=FPSCounter(),

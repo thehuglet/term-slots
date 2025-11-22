@@ -10,4 +10,4 @@ class Config:
     slots_spin_duration_stagger_ratio: float = 0.35
     slots_spin_geometric_weight: float = 0.3
     slots_after_spin_delay_sec: float = 0.8
-    hand_card_x_spacing: int = 2
+    hand_card_x_spacing: int = 1

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from term_slots.config import Config
 from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb, mul_alpha
 from term_slots.playing_card import PLAYING_CARD_WIDTH, PlayingCard, render_card_big
+from term_slots.poker_hand import PokerHand
 
 BURN_HIGHLIGHT_COLOR: RGB = lerp_rgb(RGB.ORANGE, RGB.RED, 0.7)
 
@@ -14,6 +15,7 @@ class Hand:
     cards: list[PlayingCard]
     cursor_pos: int
     selected_card_indexes: set[int]
+    current_poker_hand: PokerHand | None
 
 
 def render_hand(
@@ -69,9 +71,16 @@ def render_hand(
         for draw_call_index, draw_call in enumerate(card_draw_calls):
             rt: RichText = draw_call.rich_text
 
-            # Base card background alpha
+            # Base card alpha
             if rt.bg_color:
-                rt.bg_color *= 0.8
+                rt.bg_color *= 0.6
+            rt.text_color *= 0.8
+
+            # Selected card alpha boost
+            if card_is_selected and not burn_mode_active:
+                if rt.bg_color:
+                    rt.bg_color *= 1.5
+                rt.text_color *= 1.5
 
             # Lower alpha when hand is not focused
             if not hand_is_focused:
@@ -84,7 +93,7 @@ def render_hand(
 
             # Cursor on hand bg highlight
             if cursor_on_card and hand_is_focused and not burn_mode_active and rt.bg_color:
-                rt.bg_color = lerp_rgb(rt.bg_color, RGB.GOLD, 0.5)
+                rt.bg_color = lerp_rgb(RGB.WHITE, RGB.GOLD, 0.5)
 
             card_draw_calls[draw_call_index].rich_text = rt
 

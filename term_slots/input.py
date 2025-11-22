@@ -6,6 +6,7 @@ from term_slots import config
 from term_slots.context import Context
 from term_slots.game_state import GameState
 from term_slots.playing_card import PlayingCard
+from term_slots.poker_hand import eval_poker_hand
 from term_slots.slots import Column, calc_column_spin_duration_sec
 
 
@@ -164,6 +165,7 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
                 ctx.game_state = GameState.FORCED_BURN_MODE
 
         case Action.FOCUS_SLOTS:
+            ctx.hand.current_poker_hand = None
             ctx.hand.selected_card_indexes = set()
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
@@ -177,10 +179,20 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
             ctx.hand.cursor_pos += 1
 
         case Action.HAND_SELECT_CARD:
-            ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
+            if len(ctx.hand.selected_card_indexes) < 5:
+                ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
+                ctx.hand.current_poker_hand = eval_poker_hand(
+                    [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
+                )
 
         case Action.HAND_DESELECT_CARD:
             ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
+            if ctx.hand.selected_card_indexes:
+                ctx.hand.current_poker_hand = eval_poker_hand(
+                    [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
+                )
+            else:
+                ctx.hand.current_poker_hand = None
 
         case Action.ENTER_BURN_MODE:
             ctx.game_state = GameState.BURN_MODE
@@ -196,6 +208,7 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
         case Action.BURN_CARD:
             index_to_burn: int = ctx.hand.cursor_pos
             ctx.hand.selected_card_indexes = set()
+            ctx.hand.current_poker_hand = None
             _ = ctx.hand.cards.pop(index_to_burn)
 
             new_card_count: int = len(ctx.hand.cards)

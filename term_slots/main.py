@@ -43,6 +43,7 @@ from term_slots.slots import (
 def tick(dt: float, ctx: Context, term: Terminal, config: Config):
     if (term.width, term.height) != (ctx.screen.width, ctx.screen.height):
         ctx.screen = Screen(term.width, term.height)
+        fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
 
     # --- Inputs ---
     if input := map_input(term.inkey(timeout=0.0)):
@@ -62,8 +63,6 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
 
     # --- Rendering ---
     draw_calls: list[DrawCall] = []
-
-    fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
 
     # Slots rendering
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
@@ -158,10 +157,9 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
 def main() -> Never:
     # aces_of_spades_deck = [PlayingCard(Suit.SPADE, Rank.ACE) for _ in range(52)]
     term = Terminal()
-    screen = Screen(term.width, term.height)
     config = Config()
     ctx = Context(
-        screen=screen,
+        screen=Screen(term.width, term.height),
         game_time=0.0,
         game_state=GameState.READY_TO_SPIN_SLOTS,
         coins=500,
@@ -211,6 +209,8 @@ def main() -> Never:
 
     with term.cbreak(), term.hidden_cursor(), term.fullscreen():
         dt: float = 0.0
+
+        fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
 
         while True:
             dt *= config.game_speed

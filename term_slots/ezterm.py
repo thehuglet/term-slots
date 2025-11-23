@@ -181,12 +181,9 @@ def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> Non
             fg, bg, bold = style
             style_str = _make_style(term, fg, bg, bold)
         else:
-            style_str = style
+            style_str = style  # fallback in case
 
-        # Force a printable glyph so terminals draw the background.
-        char_to_print = "\u00a0" if char == " " else char
-
-        output.append(term.move_xy(int(x), int(y)) + style_str + char_to_print + term.normal)
+        output.append(term.move_xy(int(x), int(y)) + style_str + char + term.normal)
 
     sys.stdout.write("".join(output))
     sys.stdout.flush()
@@ -248,11 +245,14 @@ def update_fps_counter(fps_counter: FPSCounter, dt: float) -> None:
         fps_counter.ema = fps_counter.ema * (1.0 - fps_counter.alpha) + inst * fps_counter.alpha
 
 
-def _make_style(term: Terminal, fg: RGB, bg: RGB, bold: bool) -> str:
+def _make_style(term: Terminal, fg: RGB | None, bg: RGB | None, bold: bool) -> str:
     if not term.does_styling:
         return term.normal
-    fg_rgb = _rgb_to_rgb_int(fg)
-    bg_rgb = _rgb_to_rgb_int(bg)
+
+    # minimal fix: fallback to WHITE/BLACK if None
+    fg_rgb = _rgb_to_rgb_int(fg if fg is not None else RGB.WHITE)
+    bg_rgb = _rgb_to_rgb_int(bg if bg is not None else RGB.BLACK)
+
     fg_str = term.color_rgb(*fg_rgb)
     bg_str = term.on_color_rgb(*bg_rgb)
     bold_str = term.bold if bold else ""

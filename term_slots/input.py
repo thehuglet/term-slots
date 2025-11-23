@@ -269,7 +269,9 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 ctx.hand.selected_card_indexes = set()
                 # Clamp cursor to not exceed the max card index
                 new_card_count = len(ctx.hand.cards)
+
                 ctx.hand.cursor_pos = min(new_card_count - 1, ctx.hand.cursor_pos)
+                ctx.hand.cursor_pos = max(0, ctx.hand.cursor_pos)
 
                 if new_card_count == 0:
                     ctx.game_state = GameState.READY_TO_SPIN_SLOTS

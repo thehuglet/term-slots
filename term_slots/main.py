@@ -40,7 +40,10 @@ from term_slots.slots import (
 )
 
 
-def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config):
+def tick(dt: float, ctx: Context, term: Terminal, config: Config):
+    if (term.width, term.height) != (ctx.screen.width, ctx.screen.height):
+        ctx.screen = Screen(term.width, term.height)
+
     # --- Inputs ---
     if input := map_input(term.inkey(timeout=0.0)):
         if action := get_action(ctx, input):
@@ -60,13 +63,7 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
     # --- Rendering ---
     draw_calls: list[DrawCall] = []
 
-    # Hack to fix shitty terminal behavior for bg filling at the start
-    for row in range(100):
-        draw_calls.append(DrawCall(0, row, RichText("-" * 300, bg_color=RGB.BLACK)))
-        if dt > 0.0:
-            draw_calls.append(DrawCall(0, row, RichText(" " * 300, bg_color=RGB.BLACK)))
-
-    fill_screen_background(screen.new_buffer, BACKGROUND_COLOR)
+    fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
 
     # Slots rendering
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
@@ -94,7 +91,20 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
 
     # Spin cost display rendering
     spin_cost: int = calc_spin_cost(ctx.slots.spin_count)
-    draw_calls.append(DrawCall(5, 12, RichText(f"Spin cost: {spin_cost}")))
+    draw_calls.append(DrawCall(5, 12, RichText(f"Spin cost: {spin_cost}", RGB.WHITE)))
+
+    fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
+    x = ctx.screen.width - len(fps_text) - 1
+    draw_calls.append(
+        DrawCall(
+            x,
+            0,
+            RichText(
+                fps_text,
+                lerp_rgb(RGB.GREEN, RGB.WHITE, 0.6),
+            ),
+        )
+    )
 
     # Hand rendering
     hand_is_focused: bool = ctx.game_state in (
@@ -141,8 +151,8 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
     )
 
     for draw_call in draw_calls:
-        print_at(term, screen, draw_call.x, draw_call.y, draw_call.rich_text)
-    flush_diffs(term, buffer_diff(screen))
+        print_at(term, ctx.screen, draw_call.x, draw_call.y, draw_call.rich_text)
+    flush_diffs(term, buffer_diff(ctx.screen))
 
 
 def main() -> Never:
@@ -151,6 +161,7 @@ def main() -> Never:
     screen = Screen(term.width, term.height)
     config = Config()
     ctx = Context(
+        screen=screen,
         game_time=0.0,
         game_state=GameState.READY_TO_SPIN_SLOTS,
         coins=500,
@@ -198,14 +209,10 @@ def main() -> Never:
 
     fps_limiter = create_fps_limiter(144)
 
-    with (
-        term.cbreak(),
-        term.hidden_cursor(),
-        term.fullscreen(),
-    ):
+    with term.cbreak(), term.hidden_cursor(), term.fullscreen():
         dt: float = 0.0
 
         while True:
             dt *= config.game_speed
-            tick(dt, ctx, term, screen, config)
+            tick(dt, ctx, term, config)
             dt = fps_limiter()

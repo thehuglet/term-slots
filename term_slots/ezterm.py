@@ -143,7 +143,7 @@ def create_buffer(width: int, height: int) -> ScreenBuffer:
     default_style = np.empty((height, width), dtype=object)
     for y in range(height):
         for x in range(width):
-            default_style[y, x] = (RGB.WHITE, BACKGROUND_COLOR, False)
+            default_style[y, x] = (None, BACKGROUND_COLOR, False)
     return ScreenBuffer(width, height, chars, default_style)
 
 

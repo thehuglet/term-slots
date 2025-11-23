@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from term_slots.ezterm import FPSCounter, RichText
+    from term_slots.ezterm import FPSCounter, RichText, Screen
     from term_slots.game_state import GameState
     from term_slots.hand import Hand
     from term_slots.playing_card import PlayingCard
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class Context:
+    screen: Screen
     game_time: float
     game_state: GameState
     coins: int

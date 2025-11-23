@@ -140,30 +140,6 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
         ctx.debug_text = RichText(ctx.debug_text, RGB.WHITE * 0.5)
     draw_calls.append(DrawCall(35, 0, ctx.debug_text))
 
-    draw_calls.append(
-        DrawCall(
-            30,
-            11,
-            RichText(f"cursor: {ctx.hand.cursor_pos}", RGB.WHITE),
-        )
-    )
-
-    draw_calls.append(
-        DrawCall(
-            30,
-            12,
-            RichText(f"selected: {ctx.hand.selected_card_indexes}", RGB.WHITE),
-        )
-    )
-
-    draw_calls.append(
-        DrawCall(
-            30,
-            13,
-            RichText(f"cards: {ctx.hand.cards}", RGB.WHITE),
-        )
-    )
-
     # Debug game state display rendering
     draw_calls.append(
         DrawCall(

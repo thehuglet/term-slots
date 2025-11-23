@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from term_slots.config import Config
 from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb, mul_alpha
 from term_slots.playing_card import PLAYING_CARD_WIDTH, PlayingCard, render_card_big
-from term_slots.poker_hand import PokerHand
 
 BURN_HIGHLIGHT_COLOR: RGB = lerp_rgb(RGB.ORANGE, RGB.RED, 0.7)
 
@@ -15,7 +14,6 @@ class Hand:
     cards: list[PlayingCard]
     cursor_pos: int
     selected_card_indexes: set[int]
-    current_poker_hand: PokerHand | None
 
 
 def render_hand(

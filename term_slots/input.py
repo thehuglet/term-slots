@@ -189,7 +189,6 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 ctx.game_state = GameState.FORCED_BURN_MODE
 
         case Action.FOCUS_SLOTS:
-            ctx.hand.current_poker_hand = None
             ctx.hand.selected_card_indexes = set()
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
@@ -205,18 +204,9 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
         case Action.HAND_SELECT_CARD:
             if len(ctx.hand.selected_card_indexes) < 5:
                 ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
-                ctx.hand.current_poker_hand, _ = eval_poker_hand(
-                    [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
-                )
 
         case Action.HAND_DESELECT_CARD:
             ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
-            if ctx.hand.selected_card_indexes:
-                ctx.hand.current_poker_hand, _ = eval_poker_hand(
-                    [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
-                )
-            else:
-                ctx.hand.current_poker_hand = None
 
         case Action.ENTER_BURN_MODE:
             ctx.game_state = GameState.BURN_MODE
@@ -232,7 +222,6 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
         case Action.BURN_CARD:
             index_to_burn: int = ctx.hand.cursor_pos
             ctx.hand.selected_card_indexes = set()
-            ctx.hand.current_poker_hand = None
             _ = ctx.hand.cards.pop(index_to_burn)
 
             new_card_count: int = len(ctx.hand.cards)
@@ -278,7 +267,6 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 ctx.score += coin_payout
 
                 ctx.hand.selected_card_indexes = set()
-                ctx.hand.current_poker_hand = None
                 # Clamp cursor to not exceed the max card index
                 new_card_count = len(ctx.hand.cards)
                 ctx.hand.cursor_pos = min(new_card_count - 1, ctx.hand.cursor_pos)
@@ -288,6 +276,8 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
 
         case Action.SORT_HAND_BY_RANK:
             ctx.hand.cards.sort(key=lambda card: card.rank.value, reverse=True)
+            ctx.hand.selected_card_indexes = set()
 
         case Action.SORT_HAND_BY_SUIT:
             ctx.hand.cards.sort(key=lambda card: card.suit.value)
+            ctx.hand.selected_card_indexes = set()

@@ -30,7 +30,7 @@ from term_slots.playing_card import (
     Rank,
     Suit,
 )
-from term_slots.poker_hand import POKER_HAND_NAMES
+from term_slots.poker_hand import POKER_HAND_NAMES, eval_poker_hand
 from term_slots.slots import (
     Column,
     Slots,
@@ -72,7 +72,11 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
 
     # Current hand display rendering
-    if poker_hand := ctx.hand.current_poker_hand:
+    if ctx.hand.selected_card_indexes:
+        poker_hand, _ = eval_poker_hand(
+            [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
+        )
+
         draw_calls.append(
             DrawCall(
                 5,
@@ -184,7 +188,6 @@ def main() -> Never:
             ],
             cursor_pos=0,
             selected_card_indexes=set(),
-            current_poker_hand=None,
         ),
         forced_burn_replacement_card=PlayingCard(Suit.SPADE, Rank.ACE),
         fps_counter=FPSCounter(),

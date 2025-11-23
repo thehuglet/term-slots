@@ -68,6 +68,22 @@ RANK_STR: dict[Rank, str] = {
 
 FULL_DECK: list[PlayingCard] = [PlayingCard(suit, rank) for suit in Suit for rank in Rank]
 
+RANK_COIN_VALUE: dict[Rank, int] = {
+    Rank.NUM_2: 2,
+    Rank.NUM_3: 3,
+    Rank.NUM_4: 4,
+    Rank.NUM_5: 5,
+    Rank.NUM_6: 6,
+    Rank.NUM_7: 7,
+    Rank.NUM_8: 8,
+    Rank.NUM_9: 9,
+    Rank.NUM_10: 10,
+    Rank.JACK: 11,
+    Rank.QUEEN: 12,
+    Rank.KING: 13,
+    Rank.ACE: 14,
+}
+
 
 def card_rich_text(card: PlayingCard) -> RichText:
     suit_str = SUIT_STR[card.suit]

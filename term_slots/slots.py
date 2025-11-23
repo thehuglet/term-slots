@@ -13,6 +13,7 @@ SLOT_COLUMN_NEIGHBOR_COUNT = 3
 
 @dataclass
 class Slots:
+    spin_count: int
     selected_column_index: int = 0
     columns: list[Column] = field(default_factory=list)
 
@@ -26,6 +27,12 @@ class Column:
     spin_duration: float = 0.0
     spin_time_remaining: float = 0.0
     spin_speed: float = 0.0
+
+
+def calc_spin_cost(spin_count: int) -> int:
+    if spin_count <= 30:
+        return 10 + spin_count
+    return int(round(40 * (1.03 ** (spin_count - 30))))
 
 
 def calc_column_spin_duration_sec(col_index: int, cfg: Config) -> float:

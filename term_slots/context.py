@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 class Context:
     game_time: float
     game_state: GameState
+    coins: int
+    score: int
     slots: Slots
     hand: Hand
     forced_burn_replacement_card: PlayingCard

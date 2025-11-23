@@ -151,16 +151,27 @@ def buffer_diff(screen: Screen) -> list[tuple[int, int, ScreenCell]]:
     old = screen.old_buffer
     new = screen.new_buffer
 
-    mask = (old.chars != new.chars) | (old.styles != new.styles)
+    # per-char difference
+    mask_chars = old.chars != new.chars
+
+    # explicit per-cell style comparison (fg, bg, bold)
+    def style_neq(a, b):
+        return a[0] != b[0] or a[1] != b[1] or a[2] != b[2]
+
+    # use numpy.frompyfunc to vectorize the python comparator
+    style_cmp = np.frompyfunc(style_neq, 2, 1)
+    mask_styles = style_cmp(old.styles, new.styles).astype(bool)
+
+    mask = mask_chars | mask_styles
     ys, xs = np.nonzero(mask)
 
-    diffs = [(y, x, (new.chars[y, x], new.styles[y, x])) for y, x in zip(ys, xs)]  # type: ignore
+    diffs = [(int(y), int(x), (new.chars[y, x], new.styles[y, x])) for y, x in zip(ys, xs)]
 
     # Update buffers
     screen.old_buffer = ScreenBuffer(new.width, new.height, new.chars.copy(), new.styles.copy())
     screen.new_buffer = create_buffer(screen.width, screen.height)
 
-    return diffs  # type: ignore
+    return diffs  # pyright: ignore
 
 
 def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> None:
@@ -170,9 +181,12 @@ def flush_diffs(term: Terminal, diffs: list[tuple[int, int, ScreenCell]]) -> Non
             fg, bg, bold = style
             style_str = _make_style(term, fg, bg, bold)
         else:
-            style_str = style  # fallback in case
+            style_str = style
 
-        output.append(term.move_xy(int(x), int(y)) + style_str + char + term.normal)
+        # Force a printable glyph so terminals draw the background.
+        char_to_print = "\u00a0" if char == " " else char
+
+        output.append(term.move_xy(int(x), int(y)) + style_str + char_to_print + term.normal)
 
     sys.stdout.write("".join(output))
     sys.stdout.flush()

@@ -58,8 +58,15 @@ def tick(dt: float, ctx: Context, term: Terminal, screen: Screen, config: Config
     update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
     # --- Rendering ---
-    fill_screen_background(screen.new_buffer, BACKGROUND_COLOR)
     draw_calls: list[DrawCall] = []
+
+    # Hack to fix shitty terminal behavior for bg filling at the start
+    for row in range(100):
+        draw_calls.append(DrawCall(0, row, RichText("-" * 300, bg_color=RGB.BLACK)))
+        if dt > 0.0:
+            draw_calls.append(DrawCall(0, row, RichText(" " * 300, bg_color=RGB.BLACK)))
+
+    fill_screen_background(screen.new_buffer, BACKGROUND_COLOR)
 
     # Slots rendering
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
@@ -193,7 +200,7 @@ def main() -> Never:
         term.hidden_cursor(),
         term.fullscreen(),
     ):
-        dt: float = 0.01666
+        dt: float = 0.0
 
         while True:
             dt *= config.game_speed

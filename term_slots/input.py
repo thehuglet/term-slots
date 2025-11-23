@@ -147,7 +147,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
     return None
 
 
-def resolve_action(ctx: Context, action: Action, config: config.Config):
+def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
     """This mutates `ctx` directly"""
 
     match action:
@@ -250,6 +250,9 @@ def resolve_action(ctx: Context, action: Action, config: config.Config):
                 for card_index, card in enumerate(ctx.hand.cards)
                 if card_index in ctx.hand.selected_card_indexes
             ]
+
+            if not played_hand:
+                return
 
             # Additional check to prevent a potential race condition
             if result := eval_poker_hand(played_hand):

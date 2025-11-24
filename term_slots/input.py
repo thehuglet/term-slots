@@ -161,6 +161,16 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
             ctx.coins -= spin_cost
             ctx.slots.spin_count += 1
 
+            # ctx.all_text_popups.append(
+            #     TextPopup(
+            #         30,
+            #         5,
+            #         RichText("Spin!"),
+            #         duration_sec=1.0,
+            #         start_timestamp=ctx.game_time,
+            #     )
+            # )
+
             for col_index, selected_col in enumerate(ctx.slots.columns):
                 spin_duration: float = calc_column_spin_duration_sec(col_index, config)
                 selected_col.spin_duration = spin_duration
@@ -243,12 +253,7 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
             selected_cards_in_hand: list[CardInHand] = get_selected_cards_in_hand(
                 ctx.hand.cards_in_hand
             )
-
-            # Separate selected and not-selected in one pass
             selected_cards: list[PlayingCard] = [c.card for c in selected_cards_in_hand]
-            # not_selected_cards: list[PlayingCard] = [
-            #     c.card for c in ctx.hand.cards_in_hand if c not in selected_cards_in_hand
-            # ]
 
             if not selected_cards:
                 return
@@ -276,6 +281,8 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
 
                 if new_card_count == 0:
                     ctx.game_state = GameState.READY_TO_SPIN_SLOTS
+
+                # ctx.game_state = GameState.SCORING_PLAYED_HAND
 
         case Action.SORT_HAND_BY_RANK:
             ctx.hand.cards_in_hand.sort(

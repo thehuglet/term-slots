@@ -19,6 +19,7 @@ class Hand:
 class CardInHand:
     card: PlayingCard
     is_selected: bool
+    do_scoring_at_timestamp: float = 0.0
 
 
 def get_selected_cards_in_hand(cards_in_hand: list[CardInHand]) -> list[CardInHand]:

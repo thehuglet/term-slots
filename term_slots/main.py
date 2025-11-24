@@ -4,7 +4,7 @@ from typing import Never
 from blessed import Terminal
 
 from term_slots.config import Config
-from term_slots.context import Context
+from term_slots.context import Context, elapsed_fraction
 from term_slots.ezterm import (
     BACKGROUND_COLOR,
     RGB,
@@ -31,6 +31,7 @@ from term_slots.playing_card import (
     Suit,
 )
 from term_slots.poker_hand import POKER_HAND_NAMES, eval_poker_hand
+from term_slots.popup_text import render_all_text_popups
 from term_slots.slots import (
     Column,
     Slots,
@@ -58,6 +59,13 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
 
         if spin_finished:
             ctx.game_state = GameState.SLOTS_POST_SPIN_COLUMN_PICKING
+
+    # Cleanup all finished popups
+    ctx.all_text_popups = [
+        p
+        for p in ctx.all_text_popups
+        if elapsed_fraction(ctx.game_time, p.start_timestamp, p.duration_sec) < 1.0
+    ]
 
     update_fps_counter(ctx.fps_counter, dt / config.game_speed)
 
@@ -112,6 +120,7 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
         GameState.SELECTING_HAND_CARDS,
         GameState.BURN_MODE,
         GameState.FORCED_BURN_MODE,
+        GameState.SCORING_PLAYED_HAND,
     )
     burn_mode_active: bool = ctx.game_state in (
         GameState.BURN_MODE,
@@ -141,6 +150,9 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
     if isinstance(ctx.debug_text, str):
         ctx.debug_text = RichText(ctx.debug_text, RGB.WHITE * 0.5)
     draw_calls.append(DrawCall(35, 0, ctx.debug_text))
+
+    # Text popup rendering
+    draw_calls.extend(render_all_text_popups(ctx.all_text_popups, ctx.game_time))
 
     # Debug game state display rendering
     game_state_text = str(ctx.game_state.name)
@@ -174,33 +186,14 @@ def main() -> Never:
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
                 Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
-                # Column(0, FULL_DECK.copy()),
             ],
         ),
         hand=Hand(
             hand_size=10,
-            cards_in_hand=[
-                # PlayingCard(Suit.HEART, Rank.ACE),
-                # PlayingCard(Suit.HEART, Rank.ACE),
-                # PlayingCard(Suit.SPADE, Rank.ACE),
-                # PlayingCard(Suit.SPADE, Rank.ACE),
-                # PlayingCard(Suit.SPADE, Rank.ACE),
-                # PlayingCard(Suit.SPADE, Rank.ACE),
-                # PlayingCard(Suit.DIAMOND, Rank.NUM_5),
-                # PlayingCard(Suit.SPADE, Rank.NUM_5),
-                # PlayingCard(Suit.SPADE, Rank.NUM_5),
-                # PlayingCard(Suit.SPADE, Rank.NUM_3),
-                # PlayingCard(Suit.SPADE, Rank.NUM_2),
-                # PlayingCard(Suit.SPADE, Rank.QUEEN),
-            ],
+            cards_in_hand=[],
             cursor_pos=0,
         ),
+        all_text_popups=[],
         forced_burn_replacement_card=PlayingCard(Suit.SPADE, Rank.ACE),
         fps_counter=FPSCounter(),
     )

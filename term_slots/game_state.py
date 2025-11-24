@@ -8,3 +8,4 @@ class GameState(Enum):
     SELECTING_HAND_CARDS = auto()
     BURN_MODE = auto()
     FORCED_BURN_MODE = auto()
+    SCORING_PLAYED_HAND = auto()

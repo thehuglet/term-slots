@@ -76,28 +76,29 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
         draw_calls.append(
             DrawCall(
                 5,
-                23,
+                17,
                 RichText(POKER_HAND_NAMES[poker_hand]),
             )
         )
-
-    # Score display rendering
-    draw_calls.append(DrawCall(5, 14, RichText(f"Score: {ctx.score}", RGB.LIGHT_BLUE)))
-
-    # Coins display rendering
-    coins_text_color: RGB = lerp_rgb(RGB.GOLD, RGB.ORANGE, 0.4)
-    draw_calls.append(DrawCall(5, 15, RichText(f"Coins: {ctx.coins}", coins_text_color)))
 
     # Spin cost display rendering
     spin_cost: int = calc_spin_cost(ctx.slots.spin_count)
     draw_calls.append(DrawCall(5, 12, RichText(f"Spin cost: {spin_cost}", RGB.WHITE)))
 
+    # Score display rendering
+    draw_calls.append(DrawCall(5, 13, RichText(f"Score: {ctx.score}", RGB.LIGHT_BLUE)))
+
+    # Coins display rendering
+    coins_text_color: RGB = lerp_rgb(RGB.GOLD, RGB.ORANGE, 0.4)
+    draw_calls.append(DrawCall(5, 14, RichText(f"Coins: {ctx.coins}", coins_text_color)))
+
+    # FPS display rendering
     fps_text = f"{ctx.fps_counter.ema:5.1f} FPS"
     x = ctx.screen.width - len(fps_text) - 1
     draw_calls.append(
         DrawCall(
             x,
-            0,
+            1,
             RichText(
                 fps_text,
                 lerp_rgb(RGB.GREEN, RGB.WHITE, 0.6),
@@ -118,7 +119,7 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
     draw_calls.extend(
         render_hand(
             13,
-            26,
+            20,
             ctx.hand,
             config,
             ctx.game_time,
@@ -131,7 +132,7 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
     if ctx.game_state == GameState.FORCED_BURN_MODE:
         draw_calls.extend(
             render_forced_burn_replacement_card(
-                5, 26, ctx.forced_burn_replacement_card, ctx.game_time
+                5, 20, ctx.forced_burn_replacement_card, ctx.game_time
             )
         )
 
@@ -141,11 +142,13 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
     draw_calls.append(DrawCall(35, 0, ctx.debug_text))
 
     # Debug game state display rendering
+    game_state_text = str(ctx.game_state.name)
+    x = ctx.screen.width - len(game_state_text) - 1
     draw_calls.append(
         DrawCall(
+            x,
             0,
-            0,
-            RichText(str(ctx.game_state.name), lerp_rgb(RGB.RED, RGB.WHITE, 0.6)),
+            RichText(game_state_text, lerp_rgb(RGB.RED, RGB.WHITE, 0.6)),
         )
     )
 

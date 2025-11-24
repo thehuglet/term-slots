@@ -203,7 +203,7 @@ def render_column(
         # Multiplying by random alpha while spinning
         col_is_spinning: bool = column.spin_time_remaining > 0.0
         if col_is_spinning and rt.bg_color:
-            seeded_random = random.Random(card_index)
+            seeded_random = random.Random(card_index + x + y)
             rt.bg_color *= seeded_random.uniform(0.85, 1.0)
             rt.text_color = lerp_rgb(
                 rt.bg_color,

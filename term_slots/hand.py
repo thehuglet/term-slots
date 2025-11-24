@@ -2,10 +2,10 @@ import math
 from dataclasses import dataclass
 
 from term_slots.config import Config
-from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb, mul_alpha
 from term_slots.playing_card import PLAYING_CARD_WIDTH, PlayingCard, render_card_big
+from term_slots.renderer import RGBA, DrawCall, RichText, lerp_rgb, mul_darken
 
-BURN_HIGHLIGHT_COLOR: RGB = lerp_rgb(RGB.ORANGE, RGB.RED, 0.7)
+BURN_HIGHLIGHT_COLOR: RGBA = lerp_rgb(RGBA.ORANGE, RGBA.RED, 0.7)
 
 
 @dataclass
@@ -67,10 +67,10 @@ def render_hand(
         if cursor_on_card and hand_is_focused:
             arrow_x: int = card_x + 1
             arrow_y: int = card_y + 3
-            text_color: RGB = (
-                lerp_rgb(RGB.WHITE * 0.7, BURN_HIGHLIGHT_COLOR, burn_sinewave)
+            text_color: RGBA = (
+                lerp_rgb(RGBA.WHITE * 0.7, BURN_HIGHLIGHT_COLOR, burn_sinewave)
                 if burn_mode_active
-                else lerp_rgb(RGB.GOLD, RGB.WHITE, 0.5) * 0.8
+                else lerp_rgb(RGBA.BLACK, lerp_rgb(RGBA.GOLD, RGBA.WHITE, 0.5), 0.8)
             )
             draw_calls.append(DrawCall(arrow_x, arrow_y, RichText("▴", text_color)))
 
@@ -85,8 +85,8 @@ def render_hand(
 
             # Base card alpha
             if rt.bg_color:
-                rt.bg_color *= 0.6
-            rt.text_color *= 0.8
+                rt.bg_color = lerp_rgb(RGBA.BLACK, rt.bg_color, 0.6)
+            rt.text_color = lerp_rgb(RGBA.BLACK, rt.text_color, 0.8)
 
             # Selected card alpha boost
             if card_in_hand.is_selected and not burn_mode_active:
@@ -96,7 +96,7 @@ def render_hand(
 
             # Lower alpha when hand is not focused
             if not hand_is_focused:
-                rt = mul_alpha(draw_call.rich_text, 0.5)
+                rt = mul_darken(draw_call.rich_text, 0.5)
 
             # Cursor on hand burn mode highlight
             if cursor_on_card and burn_mode_active and rt.bg_color:
@@ -105,7 +105,7 @@ def render_hand(
 
             # Cursor on hand bg highlight
             if cursor_on_card and hand_is_focused and not burn_mode_active and rt.bg_color:
-                rt.bg_color = lerp_rgb(RGB.WHITE, RGB.GOLD, 0.5)
+                rt.bg_color = lerp_rgb(RGBA.WHITE, RGBA.GOLD, 0.5)
 
             card_draw_calls[draw_call_index].rich_text = rt
 

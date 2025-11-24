@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from term_slots.context import elapsed_fraction
 from term_slots.curves import ease_in
-from term_slots.ezterm import DrawCall, RichText, mul_alpha
+from term_slots.renderer import DrawCall, RichText, mul_darken
 
 
 @dataclass
@@ -25,7 +25,7 @@ def render_all_text_popups(all_text_popups: list[TextPopup], game_time: float) -
 
         rich_text: RichText = popup.text
 
-        rich_text = mul_alpha(rich_text, _calc_popup_alpha(t))
+        rich_text = mul_darken(rich_text, _calc_popup_alpha(t))
 
         draw_calls.append(
             DrawCall(

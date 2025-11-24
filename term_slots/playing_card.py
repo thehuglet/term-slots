@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from enum import IntEnum
 
-from term_slots.ezterm import RGB, DrawCall, RichText
+from term_slots.renderer import RGBA, DrawCall, RichText
 
-DEFAULT_CARD_BG_COLOR: RGB = RGB.WHITE
+DEFAULT_CARD_BG_COLOR: RGBA = RGBA.WHITE
 PLAYING_CARD_WIDTH: int = 3
 
 
@@ -36,11 +36,11 @@ class PlayingCard:
     rank: Rank
 
 
-SUIT_COLOR: dict[Suit, RGB] = {
-    Suit.SPADE: RGB.BLACK,
-    Suit.CLUB: RGB.BLACK,
-    Suit.HEART: RGB.RED * 0.7,
-    Suit.DIAMOND: RGB.RED * 0.7,
+SUIT_COLOR: dict[Suit, RGBA] = {
+    Suit.SPADE: RGBA.BLACK,
+    Suit.CLUB: RGBA.BLACK,
+    Suit.HEART: RGBA.RED * 0.7,
+    Suit.DIAMOND: RGBA.RED * 0.7,
 }
 
 SUIT_STR: dict[Suit, str] = {
@@ -95,14 +95,14 @@ def card_rich_text(card: PlayingCard) -> RichText:
     return RichText(
         text=text,
         text_color=suit_color,
-        bg_color=RGB.WHITE * 0.9,
+        bg_color=RGBA.WHITE * 0.9,
         bold=True,
     )
 
 
 def render_card_small(x: int, y: int, card: PlayingCard) -> DrawCall:
     suit_str: str = SUIT_STR[card.suit]
-    suit_color: RGB = SUIT_COLOR[card.suit]
+    suit_color: RGBA = SUIT_COLOR[card.suit]
     rank_str: str = RANK_STR[card.rank]
 
     # Pad rank with rjust(2) so "10" aligns correctly, making card width 3 chars
@@ -116,8 +116,8 @@ def render_card_big(x, y, card: PlayingCard) -> list[DrawCall]:
 
     suit_str: str = SUIT_STR[card.suit]
     rank_str: str = RANK_STR[card.rank]
-    suit_color: RGB = SUIT_COLOR[card.suit]
-    bg_color: RGB = DEFAULT_CARD_BG_COLOR
+    suit_color: RGBA = SUIT_COLOR[card.suit]
+    bg_color: RGBA = DEFAULT_CARD_BG_COLOR
 
     # Choose pattern based on rank
     if card.rank == Rank.ACE:

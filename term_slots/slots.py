@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 
 from term_slots.config import Config
 from term_slots.context import Context
-from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb, mul_alpha
 from term_slots.game_state import GameState
 from term_slots.playing_card import PlayingCard, render_card_small
+from term_slots.renderer import RGBA, DrawCall, RichText, lerp_rgb, mul_darken
 
 SLOT_COLUMN_NEIGHBOR_COUNT = 3
 
@@ -127,8 +127,10 @@ def render_slots(x: int, y: int, ctx: Context, game_time: float) -> list[DrawCal
         is_first_column: bool = col_index == 0
         is_last_column: bool = col_index == len(ctx.slots.columns) - 1
 
-        column_indicator_color: RGB = lerp_rgb(RGB.GOLD, RGB.WHITE, 0.5) * 0.4
-        row_indicator_color: RGB = lerp_rgb(RGB.GOLD, RGB.WHITE, 0.5)
+        column_indicator_color: RGBA = lerp_rgb(
+            RGBA.BLACK, lerp_rgb(RGBA.GOLD, RGBA.WHITE, 0.5), 0.4
+        )
+        row_indicator_color: RGBA = lerp_rgb(RGBA.GOLD, RGBA.WHITE, 0.5)
 
         # Dim row indicator arrows when not focussed
         if not slots_are_focused:
@@ -184,12 +186,12 @@ def render_column(
 
         # Base card background alpha
         if rt.bg_color:
-            rt.bg_color *= 0.8
+            rt.bg_color = lerp_rgb(RGBA.BLACK, rt.bg_color, 0.8)
 
         # Column center row highlight during picking phase
         if column_is_selected and rt.bg_color:
             # Column Highlight
-            rt.bg_color = lerp_rgb(rt.bg_color, RGB.GOLD, 0.3)
+            rt.bg_color = lerp_rgb(rt.bg_color, RGBA.GOLD, 0.3)
 
             # Sinewave center row highlight
             if is_center_row:
@@ -197,8 +199,8 @@ def render_column(
                 frequency: float = 6.5
                 t: float = 0.5 + 0.5 * amplitude * math.sin(frequency * game_time)
 
-                rt.bg_color = lerp_rgb(rt.bg_color, RGB.WHITE, t)
-                rt.text_color = lerp_rgb(rt.text_color, RGB.WHITE, t * 0.8)
+                rt.bg_color = lerp_rgb(rt.bg_color, RGBA.WHITE, t)
+                rt.text_color = lerp_rgb(rt.text_color, RGBA.WHITE, t * 0.8)
 
         # Multiplying by random alpha while spinning
         col_is_spinning: bool = column.spin_time_remaining > 0.0
@@ -219,7 +221,7 @@ def render_column(
             # This trick lowers the brightness and contrast when unfocussed
             alpha = alpha * 0.1 + 0.05
 
-        rt = mul_alpha(rt, alpha)
+        rt = mul_darken(rt, alpha)
 
         card_draw_call.rich_text = rt
         draw_calls.append(card_draw_call)

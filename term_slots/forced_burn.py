@@ -1,7 +1,7 @@
 import math
 
-from term_slots.ezterm import RGB, DrawCall, RichText, lerp_rgb
 from term_slots.playing_card import PlayingCard, render_card_big
+from term_slots.renderer import RGBA, DrawCall, RichText, lerp_rgb
 
 
 def render_forced_burn_replacement_card(
@@ -25,8 +25,8 @@ def render_forced_burn_replacement_card(
 
             t: float = 0.5 + 0.5 * amplitude * math.sin(frequency * game_time + phase_offset)
 
-            rt.bg_color = lerp_rgb(rt.bg_color, RGB.GREEN, t * 0.7)
-            rt.text_color = lerp_rgb(rt.text_color, RGB.GREEN, t * 0.4)
+            rt.bg_color = lerp_rgb(rt.bg_color, RGBA.GREEN, t * 0.7)
+            rt.text_color = lerp_rgb(rt.text_color, RGBA.GREEN, t * 0.4)
 
         draw_call.rich_text = rt
 

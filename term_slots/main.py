@@ -2,13 +2,23 @@ import random
 from typing import Never
 
 from blessed import Terminal
-from blessed.keyboard import Keystroke
 
 from term_slots.config import Config
 from term_slots.context import Context, elapsed_fraction
-from term_slots.ezterm import (
-    BACKGROUND_COLOR,
-    RGB,
+from term_slots.forced_burn import render_forced_burn_replacement_card
+from term_slots.game_state import GameState
+from term_slots.hand import Hand, get_selected_cards_in_hand, render_hand
+from term_slots.input import drain_input, get_action, map_input, resolve_action
+from term_slots.playing_card import (
+    FULL_DECK,
+    PlayingCard,
+    Rank,
+    Suit,
+)
+from term_slots.poker_hand import POKER_HAND_NAMES, eval_poker_hand
+from term_slots.popup_text import render_all_text_popups
+from term_slots.renderer import (
+    RGBA,
     DrawCall,
     FPSCounter,
     RichText,
@@ -21,18 +31,6 @@ from term_slots.ezterm import (
     print_at,
     update_fps_counter,
 )
-from term_slots.forced_burn import render_forced_burn_replacement_card
-from term_slots.game_state import GameState
-from term_slots.hand import Hand, get_selected_cards_in_hand, render_hand
-from term_slots.input import get_action, map_input, resolve_action
-from term_slots.playing_card import (
-    FULL_DECK,
-    PlayingCard,
-    Rank,
-    Suit,
-)
-from term_slots.poker_hand import POKER_HAND_NAMES, eval_poker_hand
-from term_slots.popup_text import render_all_text_popups
 from term_slots.slots import (
     Column,
     Slots,
@@ -41,22 +39,24 @@ from term_slots.slots import (
     spin_slots_and_check_finished,
 )
 
+BACKGROUND_COLOR: RGBA = RGBA.BLACK
+
 
 def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
     if (term.width, term.height) != (ctx.screen.width, ctx.screen.height):
         ctx.screen = Screen(term.width, term.height)
-        fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
+        fill_screen_background(ctx.screen.new_buffer, RGBA.BLACK)
 
     # --- Inputs ---
-    key_event: Keystroke = term.inkey(timeout=0.0)
+    for key_event in drain_input(term):
+        # Mouse hover memory
+        if key_event.name == "MOUSE_MOTION":
+            ctx.last_mouse_pos = key_event.mouse_xy
 
-    # Mouse hover memory
-    if key_event.name and key_event.name == "MOUSE_MOTION":
-        ctx.last_mouse_pos = key_event.mouse_xy
-
-    if input := map_input(key_event):
-        if action := get_action(ctx, input):
-            resolve_action(ctx, action, config)
+        # Other input resolution
+        if input := map_input(key_event):
+            if action := get_action(ctx, input):
+                resolve_action(ctx, action, config)
 
     # --- Game logic ---
     ctx.game_time += dt
@@ -99,13 +99,13 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
 
     # Spin cost display rendering
     spin_cost: int = calc_spin_cost(ctx.slots.spin_count)
-    draw_calls.append(DrawCall(5, 12, RichText(f"Spin cost: {spin_cost}", RGB.WHITE)))
+    draw_calls.append(DrawCall(5, 12, RichText(f"Spin cost: {spin_cost}", RGBA.WHITE)))
 
     # Score display rendering
-    draw_calls.append(DrawCall(5, 13, RichText(f"Score: {ctx.score}", RGB.LIGHT_BLUE)))
+    draw_calls.append(DrawCall(5, 13, RichText(f"Score: {ctx.score}", RGBA.LIGHT_BLUE)))
 
     # Coins display rendering
-    coins_text_color: RGB = lerp_rgb(RGB.GOLD, RGB.ORANGE, 0.4)
+    coins_text_color: RGBA = lerp_rgb(RGBA.GOLD, RGBA.ORANGE, 0.4)
     draw_calls.append(DrawCall(5, 14, RichText(f"Coins: {ctx.coins}", coins_text_color)))
 
     # FPS display rendering
@@ -117,7 +117,7 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
             1,
             RichText(
                 fps_text,
-                lerp_rgb(RGB.GREEN, RGB.WHITE, 0.6),
+                lerp_rgb(RGBA.GREEN, RGBA.WHITE, 0.6),
             ),
         )
     )
@@ -155,7 +155,7 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
 
     # Misc debug line rendering
     if isinstance(ctx.debug_text, str):
-        ctx.debug_text = RichText(ctx.debug_text, RGB.WHITE * 0.5)
+        ctx.debug_text = RichText(ctx.debug_text, RGBA.WHITE * 0.5)
     draw_calls.append(DrawCall(35, 0, ctx.debug_text))
 
     # Text popup rendering
@@ -168,14 +168,14 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
         DrawCall(
             x,
             0,
-            RichText(game_state_text, lerp_rgb(RGB.RED, RGB.WHITE, 0.6)),
+            RichText(game_state_text, lerp_rgb(RGBA.RED, RGBA.WHITE, 0.6)),
         )
     )
 
     # REALTIME MOUSE POSITION EXPERIMENT
-    # draw_calls.append(
-    #     DrawCall(ctx.last_mouse_pos[0], ctx.last_mouse_pos[1], RichText(" ", bg_color=RGB.WHITE))
-    # )
+    draw_calls.append(
+        DrawCall(ctx.last_mouse_pos[0], ctx.last_mouse_pos[1], RichText(" ", bg_color=RGBA.WHITE))
+    )
 
     for draw_call in draw_calls:
         print_at(term, ctx.screen, draw_call.x, draw_call.y, draw_call.rich_text)
@@ -224,7 +224,7 @@ def main() -> Never:
     ):
         dt: float = 0.0
 
-        fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
+        fill_screen_background(ctx.screen.new_buffer, RGBA.BLACK)
 
         while True:
             dt *= config.game_speed

@@ -1,5 +1,7 @@
 from enum import Enum, auto
+from typing import Any, Generator
 
+from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 from term_slots import config
@@ -8,6 +10,8 @@ from term_slots.game_state import GameState
 from term_slots.hand import CardInHand, get_not_selected_cards_in_hand, get_selected_cards_in_hand
 from term_slots.playing_card import RANK_COIN_VALUE, PlayingCard, Rank
 from term_slots.poker_hand import POKER_HAND_COIN_VALUE, eval_poker_hand
+from term_slots.popup_text import TextPopup
+from term_slots.renderer import RichText
 from term_slots.slots import Column, calc_column_spin_duration_sec, calc_spin_cost
 
 
@@ -57,6 +61,16 @@ KEYMAP: dict[str, Input] = {
     "x": Input.SORT_HAND_BY_RANK,
     "c": Input.SORT_HAND_BY_SUIT,
 }
+
+
+def drain_input(term: Terminal) -> Generator[Keystroke, Any, None]:
+    """Yield all pending Keystroke events this frame."""
+    while True:
+        key_event = term.inkey(timeout=0.0)
+        if not key_event:  # buffer empty
+            break
+        if isinstance(key_event, Keystroke):
+            yield key_event
 
 
 def map_input(keystroke: Keystroke) -> Input | None:

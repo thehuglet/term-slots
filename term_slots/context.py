@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class Context:
+    last_mouse_pos: tuple[int, int]
     screen: Screen
     game_time: float
     game_state: GameState

@@ -2,6 +2,7 @@ import random
 from typing import Never
 
 from blessed import Terminal
+from blessed.keyboard import Keystroke
 
 from term_slots.config import Config
 from term_slots.context import Context, elapsed_fraction
@@ -47,7 +48,13 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
         fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
 
     # --- Inputs ---
-    if input := map_input(term.inkey(timeout=0.0)):
+    key_event: Keystroke = term.inkey(timeout=0.0)
+
+    # Mouse hover memory
+    if key_event.name and key_event.name == "MOUSE_MOTION":
+        ctx.last_mouse_pos = key_event.mouse_xy
+
+    if input := map_input(key_event):
         if action := get_action(ctx, input):
             resolve_action(ctx, action, config)
 
@@ -165,6 +172,11 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
         )
     )
 
+    # REALTIME MOUSE POSITION EXPERIMENT
+    # draw_calls.append(
+    #     DrawCall(ctx.last_mouse_pos[0], ctx.last_mouse_pos[1], RichText(" ", bg_color=RGB.WHITE))
+    # )
+
     for draw_call in draw_calls:
         print_at(term, ctx.screen, draw_call.x, draw_call.y, draw_call.rich_text)
     flush_diffs(term, buffer_diff(ctx.screen))
@@ -175,6 +187,7 @@ def main() -> Never:
     term = Terminal()
     config = Config()
     ctx = Context(
+        last_mouse_pos=(0, 0),
         screen=Screen(term.width, term.height),
         game_time=0.0,
         game_state=GameState.READY_TO_SPIN_SLOTS,
@@ -203,7 +216,12 @@ def main() -> Never:
 
     fps_limiter = create_fps_limiter(144)
 
-    with term.cbreak(), term.hidden_cursor(), term.fullscreen():
+    with (
+        term.cbreak(),
+        term.hidden_cursor(),
+        term.fullscreen(),
+        term.mouse_enabled(report_motion=True),
+    ):
         dt: float = 0.0
 
         fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)

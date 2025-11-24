@@ -71,6 +71,19 @@ def get_action(ctx: Context, input: Input) -> Action | None:
     if input == Input.QUIT:
         return Action.QUIT_GAME
 
+    slots_focused_game_states: list[GameState] = [
+        GameState.READY_TO_SPIN_SLOTS,
+        GameState.SPINNING_SLOTS,
+        GameState.SLOTS_POST_SPIN_COLUMN_PICKING,
+    ]
+
+    if ctx.game_state in slots_focused_game_states:
+        if input == Input.SORT_HAND_BY_RANK:
+            return Action.SORT_HAND_BY_RANK
+
+        if input == Input.SORT_HAND_BY_SUIT:
+            return Action.SORT_HAND_BY_SUIT
+
     if ctx.game_state == GameState.READY_TO_SPIN_SLOTS:
         any_cards_in_hand: bool = len(ctx.hand.cards_in_hand) > 0
         spin_cost: int = calc_spin_cost(ctx.slots.spin_count)
@@ -81,7 +94,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
         if input == Input.SWAP and any_cards_in_hand:
             return Action.FOCUS_HAND
 
-    elif ctx.game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING:
+    if ctx.game_state == GameState.SLOTS_POST_SPIN_COLUMN_PICKING:
         first_column_is_selected: bool = ctx.slots.selected_column_index == 0
         last_column_is_selected: bool = (
             ctx.slots.selected_column_index == len(ctx.slots.columns) - 1
@@ -96,7 +109,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
         if input == Input.RIGHT and not last_column_is_selected:
             return Action.SLOTS_MOVE_SELECTION_RIGHT
 
-    elif ctx.game_state in (
+    if ctx.game_state in (
         GameState.SELECTING_HAND_CARDS,
         GameState.BURN_MODE,
         GameState.FORCED_BURN_MODE,
@@ -285,9 +298,15 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 # ctx.game_state = GameState.SCORING_PLAYED_HAND
 
         case Action.SORT_HAND_BY_RANK:
+            # First sort by suit, then rank
+            ctx.hand.cards_in_hand.sort(key=lambda card_in_hand: card_in_hand.card.suit.value)
             ctx.hand.cards_in_hand.sort(
                 key=lambda card_in_hand: card_in_hand.card.rank.value, reverse=True
             )
 
         case Action.SORT_HAND_BY_SUIT:
+            # First sort by rank, then suit
+            ctx.hand.cards_in_hand.sort(
+                key=lambda card_in_hand: card_in_hand.card.rank.value, reverse=True
+            )
             ctx.hand.cards_in_hand.sort(key=lambda card_in_hand: card_in_hand.card.suit.value)

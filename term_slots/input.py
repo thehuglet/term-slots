@@ -5,6 +5,7 @@ from blessed.keyboard import Keystroke
 from term_slots import config
 from term_slots.context import Context
 from term_slots.game_state import GameState
+from term_slots.hand import CardInHand, get_not_selected_cards_in_hand, get_selected_cards_in_hand
 from term_slots.playing_card import RANK_COIN_VALUE, PlayingCard, Rank
 from term_slots.poker_hand import POKER_HAND_COIN_VALUE, eval_poker_hand
 from term_slots.slots import Column, calc_column_spin_duration_sec, calc_spin_cost
@@ -71,7 +72,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
         return Action.QUIT_GAME
 
     if ctx.game_state == GameState.READY_TO_SPIN_SLOTS:
-        any_cards_in_hand: bool = len(ctx.hand.cards) > 0
+        any_cards_in_hand: bool = len(ctx.hand.cards_in_hand) > 0
         spin_cost: int = calc_spin_cost(ctx.slots.spin_count)
 
         if input == Input.CONFIRM and ctx.coins > spin_cost:
@@ -101,8 +102,9 @@ def get_action(ctx: Context, input: Input) -> Action | None:
         GameState.FORCED_BURN_MODE,
     ):
         cursor_is_on_first_card: bool = ctx.hand.cursor_pos == 0
-        cursor_is_on_last_card: bool = ctx.hand.cursor_pos == len(ctx.hand.cards) - 1
-        card_at_cursor_is_selected: bool = ctx.hand.cursor_pos in ctx.hand.selected_card_indexes
+        cursor_is_on_last_card: bool = ctx.hand.cursor_pos == len(ctx.hand.cards_in_hand) - 1
+
+        card_at_cursor_is_selected: bool = ctx.hand.cards_in_hand[ctx.hand.cursor_pos].is_selected
 
         if input == Input.SWAP and ctx.game_state != GameState.FORCED_BURN_MODE:
             return Action.FOCUS_SLOTS
@@ -123,7 +125,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
             return Action.SORT_HAND_BY_SUIT
 
         if input == Input.CONFIRM:
-            any_card_selected: bool = len(ctx.hand.selected_card_indexes) > 0
+            any_card_selected: bool = len(get_selected_cards_in_hand(ctx.hand.cards_in_hand)) > 0
 
             if ctx.game_state == GameState.SELECTING_HAND_CARDS and any_card_selected:
                 return Action.PLAY_HAND
@@ -135,7 +137,7 @@ def get_action(ctx: Context, input: Input) -> Action | None:
                 return Action.BURN_CARD_FORCED
 
         if ctx.game_state == GameState.SELECTING_HAND_CARDS:
-            if input == Input.TOGGLE_BURN_MODE and ctx.hand.cards:
+            if input == Input.TOGGLE_BURN_MODE and ctx.hand.cards_in_hand:
                 return Action.ENTER_BURN_MODE
 
             if input == Input.UP and not card_at_cursor_is_selected:
@@ -173,7 +175,7 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
             ctx.slots.selected_column_index += 1
 
         case Action.SLOTS_PICK_CARD:
-            empty_card_slot_available: bool = len(ctx.hand.cards) < ctx.hand.hand_size
+            empty_card_slot_available: bool = len(ctx.hand.cards_in_hand) < ctx.hand.hand_size
 
             selected_col: Column = ctx.slots.columns[ctx.slots.selected_column_index]
             selected_card_index: int = int(selected_col.cursor) % len(selected_col.cards)
@@ -181,7 +183,7 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
 
             if empty_card_slot_available:
                 # Add card to hand
-                ctx.hand.cards.append(selected_card)
+                ctx.hand.cards_in_hand.append(CardInHand(selected_card, is_selected=False))
                 ctx.game_state = GameState.READY_TO_SPIN_SLOTS
             else:
                 # Cant add card, force burning
@@ -189,7 +191,8 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 ctx.game_state = GameState.FORCED_BURN_MODE
 
         case Action.FOCUS_SLOTS:
-            ctx.hand.selected_card_indexes = set()
+            for card_in_hand in ctx.hand.cards_in_hand:
+                card_in_hand.is_selected = False
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
         case Action.FOCUS_HAND:
@@ -202,11 +205,13 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
             ctx.hand.cursor_pos += 1
 
         case Action.HAND_SELECT_CARD:
-            if len(ctx.hand.selected_card_indexes) < 5:
-                ctx.hand.selected_card_indexes.add(ctx.hand.cursor_pos)
+            selected_card_count: int = len(get_selected_cards_in_hand(ctx.hand.cards_in_hand))
+
+            if selected_card_count < 5:
+                ctx.hand.cards_in_hand[ctx.hand.cursor_pos].is_selected = True
 
         case Action.HAND_DESELECT_CARD:
-            ctx.hand.selected_card_indexes.remove(ctx.hand.cursor_pos)
+            ctx.hand.cards_in_hand[ctx.hand.cursor_pos].is_selected = False
 
         case Action.ENTER_BURN_MODE:
             ctx.game_state = GameState.BURN_MODE
@@ -216,15 +221,16 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
 
         case Action.BURN_CARD_FORCED:
             index_to_replace: int = ctx.hand.cursor_pos
-            ctx.hand.cards[index_to_replace] = ctx.forced_burn_replacement_card
+            ctx.hand.cards_in_hand[index_to_replace] = CardInHand(
+                ctx.forced_burn_replacement_card, is_selected=False
+            )
             ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
         case Action.BURN_CARD:
             index_to_burn: int = ctx.hand.cursor_pos
-            ctx.hand.selected_card_indexes = set()
-            _ = ctx.hand.cards.pop(index_to_burn)
+            _ = ctx.hand.cards_in_hand.pop(index_to_burn)
 
-            new_card_count: int = len(ctx.hand.cards)
+            new_card_count = len(ctx.hand.cards_in_hand)
 
             if new_card_count == 0:
                 ctx.game_state = GameState.READY_TO_SPIN_SLOTS
@@ -234,26 +240,24 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                 ctx.game_state = GameState.SELECTING_HAND_CARDS
 
         case Action.PLAY_HAND:
-            played_hand: list[PlayingCard] = [
-                card
-                for card_index, card in enumerate(ctx.hand.cards)
-                if card_index in ctx.hand.selected_card_indexes
-            ]
+            selected_cards_in_hand: list[CardInHand] = get_selected_cards_in_hand(
+                ctx.hand.cards_in_hand
+            )
 
-            if not played_hand:
+            # Separate selected and not-selected in one pass
+            selected_cards: list[PlayingCard] = [c.card for c in selected_cards_in_hand]
+            # not_selected_cards: list[PlayingCard] = [
+            #     c.card for c in ctx.hand.cards_in_hand if c not in selected_cards_in_hand
+            # ]
+
+            if not selected_cards:
                 return
 
             # Additional check to prevent a potential race condition
-            if result := eval_poker_hand(played_hand):
+            if result := eval_poker_hand(selected_cards):
                 poker_hand, scoring_cards = result
 
-                remaining_cards: list[PlayingCard] = [
-                    card
-                    for card_index, card in enumerate(ctx.hand.cards)
-                    if card_index not in ctx.hand.selected_card_indexes
-                ]
-
-                ctx.hand.cards = remaining_cards
+                ctx.hand.cards_in_hand = get_not_selected_cards_in_hand(ctx.hand.cards_in_hand)
 
                 coin_payout: int = 0
                 coin_payout += POKER_HAND_COIN_VALUE[poker_hand]
@@ -263,13 +267,10 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                     coin_payout += RANK_COIN_VALUE[rank]
 
                 ctx.coins += coin_payout
-
                 ctx.score += coin_payout
 
-                ctx.hand.selected_card_indexes = set()
                 # Clamp cursor to not exceed the max card index
-                new_card_count = len(ctx.hand.cards)
-
+                new_card_count = len(ctx.hand.cards_in_hand)
                 ctx.hand.cursor_pos = min(new_card_count - 1, ctx.hand.cursor_pos)
                 ctx.hand.cursor_pos = max(0, ctx.hand.cursor_pos)
 
@@ -277,9 +278,9 @@ def resolve_action(ctx: Context, action: Action, config: config.Config) -> None:
                     ctx.game_state = GameState.READY_TO_SPIN_SLOTS
 
         case Action.SORT_HAND_BY_RANK:
-            ctx.hand.cards.sort(key=lambda card: card.rank.value, reverse=True)
-            ctx.hand.selected_card_indexes = set()
+            ctx.hand.cards_in_hand.sort(
+                key=lambda card_in_hand: card_in_hand.card.rank.value, reverse=True
+            )
 
         case Action.SORT_HAND_BY_SUIT:
-            ctx.hand.cards.sort(key=lambda card: card.suit.value)
-            ctx.hand.selected_card_indexes = set()
+            ctx.hand.cards_in_hand.sort(key=lambda card_in_hand: card_in_hand.card.suit.value)

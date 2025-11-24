@@ -22,7 +22,7 @@ from term_slots.ezterm import (
 )
 from term_slots.forced_burn import render_forced_burn_replacement_card
 from term_slots.game_state import GameState
-from term_slots.hand import Hand, render_hand
+from term_slots.hand import Hand, get_selected_cards_in_hand, render_hand
 from term_slots.input import get_action, map_input, resolve_action
 from term_slots.playing_card import (
     FULL_DECK,
@@ -40,7 +40,7 @@ from term_slots.slots import (
 )
 
 
-def tick(dt: float, ctx: Context, term: Terminal, config: Config):
+def tick(dt: float, ctx: Context, term: Terminal, config: Config) -> None:
     if (term.width, term.height) != (ctx.screen.width, ctx.screen.height):
         ctx.screen = Screen(term.width, term.height)
         fill_screen_background(ctx.screen.new_buffer, BACKGROUND_COLOR)
@@ -68,10 +68,11 @@ def tick(dt: float, ctx: Context, term: Terminal, config: Config):
     draw_calls.extend(render_slots(13, 6, ctx, ctx.game_time))
 
     # Current hand display rendering
-    if ctx.hand.selected_card_indexes:
-        poker_hand, _ = eval_poker_hand(
-            [ctx.hand.cards[card_index] for card_index in ctx.hand.selected_card_indexes]
-        )
+    selected_cards: list[PlayingCard] = [
+        c.card for c in get_selected_cards_in_hand(ctx.hand.cards_in_hand)
+    ]
+    if selected_cards:
+        poker_hand, _ = eval_poker_hand(selected_cards)
 
         draw_calls.append(
             DrawCall(
@@ -184,7 +185,7 @@ def main() -> Never:
         ),
         hand=Hand(
             hand_size=10,
-            cards=[
+            cards_in_hand=[
                 # PlayingCard(Suit.HEART, Rank.ACE),
                 # PlayingCard(Suit.HEART, Rank.ACE),
                 # PlayingCard(Suit.SPADE, Rank.ACE),
@@ -199,7 +200,6 @@ def main() -> Never:
                 # PlayingCard(Suit.SPADE, Rank.QUEEN),
             ],
             cursor_pos=0,
-            selected_card_indexes=set(),
         ),
         forced_burn_replacement_card=PlayingCard(Suit.SPADE, Rank.ACE),
         fps_counter=FPSCounter(),
